@@ -32,7 +32,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `http://${BACKEND_IP}:8000/api/customers/${customerId}`,
+        `https://${BACKEND_IP}:8000/api/customers/${customerId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
