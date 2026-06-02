@@ -12,7 +12,6 @@ export default function ExcelUploader({
   backendIp,
 }: ExcelUploaderProps) {
   const [loading, setLoading] = useState<boolean>(false);
-  const BACKEND_IP = "sales-map-backend.onrender.com";
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -25,7 +24,7 @@ export default function ExcelUploader({
 
     try {
       const response = await fetch(
-        `https://${BACKEND_IP}/api/customers/upload`,
+        `https://${backendIp}/api/customers/upload`,
         {
           method: "POST",
           body: formData,
@@ -49,7 +48,7 @@ export default function ExcelUploader({
     )
       return;
     try {
-      const response = await fetch(`https://${BACKEND_IP}/api/customers`, {
+      const response = await fetch(`https://${backendIp}/api/customers`, {
         method: "DELETE",
       });
       if (response.ok) {
