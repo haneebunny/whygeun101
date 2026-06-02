@@ -3,6 +3,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+raw_db_url = os.getenv("DATABASE_URL")
+
 # 💡 Render 환경 변수(DATABASE_URL)를 먼저 읽어옴
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sales_map.db")
 
