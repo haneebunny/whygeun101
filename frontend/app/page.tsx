@@ -16,7 +16,7 @@ export default function Home() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(`http://${BACKEND_IP}:8000/api/customers`);
+      const response = await fetch(`https://${BACKEND_IP}/api/customers`);
       if (response.ok) {
         const data = await response.json();
         setSuccessCustomers(data.success_list || []);
