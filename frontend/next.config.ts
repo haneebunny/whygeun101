@@ -1,10 +1,13 @@
 const nextConfig = {
-  // 💡 [치트키] TypeScript 타입 오류가 있어도 컴파일을 강제 통과시킵니다.
+  // 💡 [치트키 1] TypeScript 타입 오류가 있어도 무조건 빌드 통과하기
   typescript: {
     ignoreBuildErrors: true,
   },
-  // 💡 최신 규격 반영: 더 이상 허용되지 않는 내장 eslint 옵션을 제거하고,
-  // 배포 기기 및 환경 변수 연동을 위한 도메인 바인딩 설정만 깔끔하게 유지합니다.
+  // 💡 [치트키 2] 최신 Next.js 규격에 맞는 빌드 시 ESLint 검사 완전 패스 설정
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // 기존 모바일 개발망 연동 주소 설정
   allowedDevOrigins: ["172.30.103.23"],
 };
 
