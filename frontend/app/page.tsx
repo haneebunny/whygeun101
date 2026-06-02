@@ -7,7 +7,7 @@ import CustomerList from "@/components/CustomerList";
 import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
-  const BACKEND_IP = "172.30.103.23";
+  const BACKEND_IP = "sales-map-backend.onrender.com";
 
   const [successCustomers, setSuccessCustomers] = useState<Customer[]>([]);
   const [failedCustomers, setFailedCustomers] = useState<FailedCustomer[]>([]);
