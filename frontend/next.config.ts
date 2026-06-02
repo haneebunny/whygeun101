@@ -7,7 +7,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // 기존 모바일 개발망 연동 주소 설정
   allowedDevOrigins: ["172.30.103.23"],
 };
 
