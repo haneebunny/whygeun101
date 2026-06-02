@@ -1,10 +1,10 @@
-import os
+import os  
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # 💡 Render 환경 변수(DATABASE_URL)를 먼저 읽어옴
-raw_db_url = os.getenv("DATABASE_URL")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sales_map.db")
 
 if raw_db_url:
     # 💡 [핵심] Render가 준 주소가 postgresql://로 시작한다면, 
