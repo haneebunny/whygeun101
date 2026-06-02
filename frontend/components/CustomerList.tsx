@@ -5,9 +5,13 @@ import { Customer } from "@/types";
 
 interface CustomerListProps {
   customers: Customer[];
+  handleDelete: (customerId: number) => void;
 }
 
-export default function CustomerList({ customers }: CustomerListProps) {
+export default function CustomerList({
+  customers,
+  handleDelete,
+}: CustomerListProps) {
   const validCustomers = customers.filter((c) => c.latitude && c.longitude);
 
   const handleNaviOpen = (
@@ -16,16 +20,12 @@ export default function CustomerList({ customers }: CustomerListProps) {
     customer: Customer,
   ) => {
     e.preventDefault();
-
-    // 모바일 기기 여부 판별 (iOS, Android 등)
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     if (type === "tmap") {
       if (isMobile) {
-        // 모바일 기기일 때는 티맵 앱 앱스키마 구동
         window.location.href = `tmap://route?goalx=${customer.longitude}&goaly=${customer.latitude}&goalname=${encodeURIComponent(customer.name)}`;
       } else {
-        // PC 브라우저 환경일 때는 에러 창 대신 티맵 웹 지도 주소로 안전하게 안내 우회
         window.open(
           `https://map.naver.com/v5/?lng=${customer.longitude}&lat=${customer.latitude}&title=${encodeURIComponent(customer.name)}&isCorrectAnswer=true`,
           "_blank",
@@ -33,15 +33,20 @@ export default function CustomerList({ customers }: CustomerListProps) {
       }
     } else if (type === "nmap") {
       if (isMobile) {
-        // 모바일 네이버 지도 앱 구동
         window.location.href = `nmap://route?dlat=${customer.latitude}&dlng=${customer.longitude}&dname=${encodeURIComponent(customer.name)}&appname=sales_map`;
       } else {
-        // PC 브라우저 환경일 때는 네이버 웹 지도 경로 탐색 창으로 다이렉트 연결
         window.open(
           `https://map.naver.com/v5/direction////${customer.longitude},${customer.latitude},${encodeURIComponent(customer.name)}/-/car`,
           "_blank",
         );
       }
+    }
+  };
+
+  // 💡 [핵심 추가] 리스트 아이템 클릭 시 지도 마커 포커싱 핸들러
+  const handleItemClick = (id: number) => {
+    if ((window as any).focusCustomerMarker) {
+      (window as any).focusCustomerMarker(id);
     }
   };
 
@@ -60,15 +65,30 @@ export default function CustomerList({ customers }: CustomerListProps) {
           validCustomers.map((customer) => (
             <div
               key={customer.id}
-              className="flex flex-col gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100"
+              className="flex flex-col gap-2.5 p-3 bg-slate-50 rounded-lg border border-slate-100/80 hover:bg-slate-100/70 transition-colors"
             >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-sm text-slate-800">
-                  {customer.name}
-                </span>
-                <span className="text-xs text-slate-500 truncate">
-                  {customer.address}
-                </span>
+              <div className="flex items-start justify-between gap-2">
+                {/* 💡 [수정] 이름과 주소 래퍼 영역을 버튼(div역할)으로 개설하여 클릭 시 지도 동적 이동 트리거 가동 */}
+                <div
+                  onClick={() => handleItemClick(customer.id)}
+                  className="flex flex-col gap-0.5 flex-1 min-w-0 cursor-pointer active:opacity-70"
+                  title="지도에서 위치 확인"
+                >
+                  <span className="font-bold text-sm text-slate-800 truncate">
+                    {customer.name}
+                  </span>
+                  <span className="text-xs text-slate-500 truncate">
+                    {customer.address}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => handleDelete(customer.id)}
+                  className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all text-sm shrink-0"
+                  title="삭제"
+                >
+                  ✕
+                </button>
               </div>
 
               <div className="flex gap-2">

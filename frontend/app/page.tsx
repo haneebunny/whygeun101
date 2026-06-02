@@ -7,7 +7,11 @@ import CustomerList from "@/components/CustomerList";
 import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
-  const BACKEND_IP = "sales-map-db.onrender.com";
+  const IS_DEV = process.env.NODE_ENV === "development";
+
+  const BACKEND_IP = IS_DEV
+    ? "172.30.103.23:8000"
+    : "sales-map-db.onrender.com";
 
   const [successCustomers, setSuccessCustomers] = useState<Customer[]>([]);
   const [failedCustomers, setFailedCustomers] = useState<FailedCustomer[]>([]);
@@ -16,7 +20,8 @@ export default function Home() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch(`https://${BACKEND_IP}/api/customers`);
+      const protocol = IS_DEV ? "http" : "https";
+      const response = await fetch(`${protocol}://${BACKEND_IP}/api/customers`);
       if (response.ok) {
         const data = await response.json();
         setSuccessCustomers(data.success_list || []);
@@ -31,8 +36,10 @@ export default function Home() {
     if (!editText.trim()) return;
 
     try {
+      // 💡 [교정] 프로토콜 스위칭 주입
+      const protocol = IS_DEV ? "http" : "https";
       const response = await fetch(
-        `https://${BACKEND_IP}/api/customers/${customerId}`,
+        `${protocol}://${BACKEND_IP}/api/customers/${customerId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -47,7 +54,7 @@ export default function Home() {
             `${resData.customer.name} 님의 좌표가 성공적으로 등록되었습니다!`,
           );
           setEditId(null);
-          fetchCustomers(); // 성공/실패 목록 재싱크 및 새로고침 영구 반영
+          fetchCustomers();
         } else {
           alert(
             "수정된 주소로도 카카오 좌표를 찾지 못했습니다. 주소를 다시 확인해 주세요.",
@@ -59,8 +66,33 @@ export default function Home() {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    if (!confirm("이 고객을 지도와 목록에서 제거하시겠습니까?")) return;
+
+    try {
+      // 💡 [교정] 프로토콜 스위칭을 완벽히 주입하여 Failed to fetch 버그 원천 차단
+      const protocol = IS_DEV ? "http" : "https";
+      const response = await fetch(
+        `${protocol}://${BACKEND_IP}/api/customers/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (response.ok) {
+        fetchCustomers(); // 디비 삭제 완수 후 클라이언트 데이터 실시간 재싱크
+      } else {
+        alert("삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("삭제 오류:", error);
+    }
+  };
+
   useEffect(() => {
     fetchCustomers();
+    // 💡 분리된 KakaoMap 컴포넌트 내 인라인 HTML 클릭 리스너가 추적할 수 있도록 전역 객체 바인딩
+    (window as any).handleDeleteCustomer = handleDelete;
   }, []);
 
   return (
@@ -76,7 +108,6 @@ export default function Home() {
 
       <ExcelUploader onUploadSuccess={fetchCustomers} backendIp={BACKEND_IP} />
 
-      {/* 💡 지속성 확보: 영구 보존된 실패 리스트가 존재할 때만 렌더링 */}
       {failedCustomers.length > 0 && (
         <div className="flex flex-col gap-2 p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-sm shadow-sm">
           <div className="font-bold text-xs">
@@ -134,9 +165,10 @@ export default function Home() {
         </div>
       )}
 
+      {/* 💡 정돈된 성공 고객 배열을 깔끔하게 각 컴포넌트로 단방향 주입 */}
       <KakaoMap customers={successCustomers} />
 
-      <CustomerList customers={successCustomers} />
+      <CustomerList customers={successCustomers} handleDelete={handleDelete} />
     </main>
   );
 }

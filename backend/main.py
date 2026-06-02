@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from backend import models
 from backend import schemas
 from backend.database import engine, get_db
+from backend.models import Customer
 
 load_dotenv()
 
@@ -162,3 +163,18 @@ def get_customers(db: Session = Depends(get_db)):
         "success_list": success_list,
         "failed_list": failed_list
     }
+
+
+@app.delete("/api/customers/{customer_id}")
+def delete_customer(customer_id: int, db: Session = Depends(get_db)):
+    # 💡 데이터베이스에서 해당 ID를 가진 고객 탐색
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="고객을 찾을 수 없습니다.")
+    
+    # 💡 데이터 삭제 및 커밋
+    db.delete(customer)
+    db.commit()
+    
+    return {"message": "성공적으로 삭제되었습니다.", "deleted_id": customer_id}
