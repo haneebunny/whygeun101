@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sales-map-db.vercel.app"),
   title: "외근의 정석",
   description: "위치 기반 동선 관리로 매일 더 스마트한 외근을 시작하세요.",
   authors: [{ name: "현서친구 하니" }],
