@@ -37,7 +37,6 @@ export default function CustomerList({
     if (!searchTerm) return true;
 
     // Hangul.search('안희지', '않') -> 일치하면 인덱스(0), 없으면 -1을 반환함!
-    // 자모음을 완전히 분해해서 비교하기 때문에 '둥ㄷ'이나 '않' 검색이 완벽하게 작동해.
     const matchName = c.name ? Hangul.search(c.name, searchTerm) !== -1 : false;
     const matchAddress = c.address
       ? Hangul.search(c.address, searchTerm) !== -1

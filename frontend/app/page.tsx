@@ -6,6 +6,7 @@ import ExcelUploader from "@/components/ExcelUploader";
 import KakaoMap from "@/components/KakaoMap";
 import CustomerList from "@/components/CustomerList";
 import BottomNav from "@/components/BottomNav";
+import Login from "@/components/Login";
 import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
@@ -20,10 +21,47 @@ export default function Home() {
   const [editId, setEditId] = useState<number | null>(null);
   const [editText, setEditText] = useState<string>("");
 
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 💡 닉네임을 저장할 상태 추가
+  const [nickname, setNickname] = useState<string>("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const storedNickname = localStorage.getItem("nickname"); // 💡 금고에서 닉네임 꺼내기
+
+    if (token) {
+      setIsLoggedIn(true);
+      if (storedNickname) setNickname(storedNickname);
+    }
+    setIsLoading(false);
+  }, []);
+
+  // 💡 로그아웃 기능 추가
+  const handleLogout = () => {
+    if (!confirm("로그아웃 하시겠습니까?")) return;
+
+    localStorage.removeItem("token");
+    localStorage.removeItem("nickname");
+
+    // 상태 초기화해서 로그인 화면으로 돌아가게 만들기
+    setIsLoggedIn(false);
+    setNickname("");
+    setSuccessCustomers([]);
+    setFailedCustomers([]);
+  };
+
   const fetchCustomers = async () => {
     try {
+      const token = localStorage.getItem("token");
       const protocol = IS_DEV ? "http" : "https";
-      const response = await fetch(`${protocol}://${BACKEND_IP}/api/customers`);
+      const response = await fetch(
+        `${protocol}://${BACKEND_IP}/api/customers`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (response.ok) {
         const data = await response.json();
         setSuccessCustomers(data.success_list || []);
@@ -37,12 +75,16 @@ export default function Home() {
   const handleEditSubmit = async (customerId: number) => {
     if (!editText.trim()) return;
     try {
+      const token = localStorage.getItem("token");
       const protocol = IS_DEV ? "http" : "https";
       const response = await fetch(
         `${protocol}://${BACKEND_IP}/api/customers/${customerId}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ address: editText }),
         },
       );
@@ -63,11 +105,13 @@ export default function Home() {
   const handleDelete = async (id: number) => {
     if (!confirm("삭제하시겠습니까?")) return;
     try {
+      const token = localStorage.getItem("token");
       const protocol = IS_DEV ? "http" : "https";
       const response = await fetch(
         `${protocol}://${BACKEND_IP}/api/customers/${id}`,
         {
           method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
         },
       );
       if (response.ok) fetchCustomers();
@@ -77,55 +121,40 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchCustomers();
-    (window as any).handleDeleteCustomer = handleDelete;
-  }, []);
+    if (isLoggedIn) {
+      fetchCustomers();
+      (window as any).handleDeleteCustomer = handleDelete;
+    }
+  }, [isLoggedIn]);
+
+  if (isLoading) return <div className="min-h-screen bg-[#f5f7fa]"></div>;
+  if (!isLoggedIn) return <Login />;
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] flex flex-col max-w-md mx-auto relative shadow-2xl overflow-x-hidden">
+      {/* 💡 헤더(Header) 영역 수정: 닉네임과 로그아웃 버튼 추가 */}
       <header className="flex justify-between items-center px-5 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          className="text-slate-600"
-        >
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-        <div className="flex items-center gap-1 text-blue-600">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <div className="flex items-center gap-1.5 text-blue-600">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
+          <span className="font-black text-[15px] text-slate-800 tracking-tight">
+            외근의 정석
+          </span>
         </div>
-        <div className="flex items-center gap-4 text-slate-600">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+            <span className="text-[11px] font-bold text-blue-700">
+              {nickname}님
+            </span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-[11px] font-bold text-slate-400 hover:text-rose-500 transition"
           >
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-          </svg>
+            로그아웃
+          </button>
         </div>
       </header>
 

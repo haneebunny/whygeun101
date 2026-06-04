@@ -57,7 +57,7 @@ export default function KakaoMap({
       }
     };
 
-    // 💡 DB에 실시간 저장 로직 추가 & 하니의 파일명 적용
+    // 💡 DB에 실시간 저장 로직 추가
     (window as any).changeMarkerStatus = async (id: number, status: string) => {
       const target = markerMapRef.current[id];
       if (target && target.marker) {
@@ -72,13 +72,16 @@ export default function KakaoMap({
         target.marker.setImage(newImage);
       }
 
-      // 백엔드로 상태 업데이트 요청 전송
       const protocol =
         process.env.NODE_ENV === "development" ? "http" : "https";
       try {
+        const token = localStorage.getItem("token"); // 👈 토큰 꺼내기
         await fetch(`${protocol}://${backendIp}/api/customers/${id}/status`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // 👈 추가
+          },
           body: JSON.stringify({ status }),
         });
       } catch (error) {

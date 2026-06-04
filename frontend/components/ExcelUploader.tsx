@@ -20,12 +20,14 @@ export default function ExcelUploader({
     const formData = new FormData();
     formData.append("file", e.target.files[0]);
     setLoading(true);
+
     try {
-      // 💡 https:// 고정되어 있던 부분을 ${protocol}:// 로 변경!
+      const token = localStorage.getItem("token"); // 👈 토큰 꺼내기
       const response = await fetch(
         `${protocol}://${backendIp}/api/customers/upload`,
         {
           method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         },
       );
@@ -42,9 +44,10 @@ export default function ExcelUploader({
   const handleClearAll = async () => {
     if (!confirm("초기화하시겠습니까?")) return;
     try {
-      // 💡 여기도 ${protocol}:// 로 변경!
+      const token = localStorage.getItem("token");
       const response = await fetch(`${protocol}://${backendIp}/api/customers`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) onUploadSuccess();
     } catch {
