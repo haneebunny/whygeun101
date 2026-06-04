@@ -37,7 +37,7 @@ function CallbackContent() {
           // 💡 발급받은 '출입증(토큰)'을 내 브라우저 금고(localStorage)에 보관!
           localStorage.setItem("token", data.access_token);
           localStorage.setItem("nickname", data.nickname);
-          alert(`${data.nickname}님 환영합니다! 🎉`);
+
           router.push("/"); // 메인 화면으로 돌아가기
         } else {
           alert("로그인에 실패했습니다.");
