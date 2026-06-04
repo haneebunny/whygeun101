@@ -18,4 +18,6 @@ export interface Customer {
   address: string;
   latitude: number | null;
   longitude: number | null;
+  phone?: string;
+  status?: string;
 }

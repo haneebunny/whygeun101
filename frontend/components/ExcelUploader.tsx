@@ -2,86 +2,111 @@
 
 import React, { useState } from "react";
 
-interface ExcelUploaderProps {
-  onUploadSuccess: () => void;
-  backendIp: string;
-}
-
 export default function ExcelUploader({
   onUploadSuccess,
   backendIp,
-}: ExcelUploaderProps) {
-  const [loading, setLoading] = useState<boolean>(false);
+}: {
+  onUploadSuccess: () => void;
+  backendIp: string;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  // 💡 로컬 환경(http)인지 클라우드 환경(https)인지 자동으로 판단!
+  const IS_DEV = process.env.NODE_ENV === "development";
+  const protocol = IS_DEV ? "http" : "https";
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-
-    const file = e.target.files[0];
     const formData = new FormData();
-    formData.append("file", file);
-
+    formData.append("file", e.target.files[0]);
     setLoading(true);
-
     try {
+      // 💡 https:// 고정되어 있던 부분을 ${protocol}:// 로 변경!
       const response = await fetch(
-        `https://${backendIp}/api/customers/upload`,
+        `${protocol}://${backendIp}/api/customers/upload`,
         {
           method: "POST",
           body: formData,
         },
       );
-
-      if (!response.ok) throw new Error("서버 업로드 실패");
-
+      if (!response.ok) throw new Error();
       alert("엑셀 명단 싱크가 완료되었습니다!");
       onUploadSuccess();
-    } catch (error) {
-      alert("파일 업로드 중 오류가 발생했습니다.");
+    } catch {
+      alert("오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleClearAll = async () => {
-    if (
-      !confirm("현재 등록된 모든 고객 동선 데이터를 완전히 초기화하시겠습니까?")
-    )
-      return;
+    if (!confirm("초기화하시겠습니까?")) return;
     try {
-      const response = await fetch(`https://${backendIp}/api/customers`, {
+      // 💡 여기도 ${protocol}:// 로 변경!
+      const response = await fetch(`${protocol}://${backendIp}/api/customers`, {
         method: "DELETE",
       });
-      if (response.ok) {
-        alert("모든 데이터가 청소되었습니다.");
-        onUploadSuccess();
-      }
-    } catch (e) {
-      alert("초기화 중 오류 발생");
+      if (response.ok) onUploadSuccess();
+    } catch {
+      alert("오류 발생");
     }
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-      <div className="flex justify-between items-start">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold text-slate-800">
-            고객 명단 엑셀 등록
-          </h3>
+    <div className="flex flex-col gap-3 p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#2563eb"
+            strokeWidth="2"
+            className="bg-blue-50 p-1 rounded-md"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <h3 className="text-sm font-bold text-slate-800">엑셀 등록</h3>
         </div>
         <button
           onClick={handleClearAll}
-          className="text-xs font-semibold text-rose-500 bg-rose-50 px-2.5 py-1.5 rounded-md hover:bg-rose-100 transition"
+          className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 transition"
         >
-          🧹 전체 초기화
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <polyline points="3 3 3 8 8 8"></polyline>
+          </svg>
+          초기화
         </button>
       </div>
 
-      <label className="flex items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
-        <div className="flex flex-col items-center gap-2 text-slate-500">
-          <span className="text-sm font-medium">
-            {loading
-              ? "카카오 엔진 좌표 연동 중..."
-              : "클릭하여 새 명단 업로드"}
+      <label className="flex items-center justify-center w-full py-4 border-2 border-dashed border-blue-200 rounded-xl cursor-pointer bg-blue-50/30 hover:bg-blue-50 transition gap-3">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#60a5fa"
+          strokeWidth="2"
+          className="bg-white rounded-full shadow-sm p-1"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <div className="flex flex-col">
+          <span className="text-sm font-bold text-slate-700">
+            {loading ? "연동 중..." : "명단 파일(.xlsx) 선택"}
           </span>
         </div>
         <input

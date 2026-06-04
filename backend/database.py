@@ -32,5 +32,5 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
-    except:
+    finally:
         db.close()

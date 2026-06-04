@@ -13,6 +13,7 @@ from backend import models
 from backend import schemas
 from backend.database import engine, get_db
 from backend.models import Customer
+from backend.schemas import AddressUpdateRequest, StatusUpdateRequest
 
 load_dotenv()
 
@@ -30,8 +31,7 @@ app.add_middleware(
 
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
 
-class AddressUpdateRequest(BaseModel):
-    address: str
+
 
 def get_coordinates_via_kakao(address: str) -> tuple[float | None, float | None]:
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
@@ -68,11 +68,28 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
         df = pd.read_excel(io.BytesIO(contents))
         
         if '실사용자명' not in df.columns or '주소' not in df.columns:
-            raise HTTPException(status_code=400, detail="엑셀 파일에 '실사용자명'과 '주소' 열이 존재해야 합니다.")
+            raise HTTPException(status_code=400, detail="'실사용자명'과 '주소' 열이 필요합니다.")
+            
+        phone_col = '휴대폰번호' if '휴대폰번호' in df.columns else '전화번호' if '전화번호' in df.columns else None
         
         for index, row in df.iterrows():
             name = str(row['실사용자명']).strip()
             raw_address = str(row['주소']).strip()
+            
+            # 💡 [전화번호 보정 로직 추가]
+            phone = ""
+            if phone_col and pd.notna(row[phone_col]):
+                phone_raw = str(row[phone_col]).strip()
+                
+                # 1. 엑셀이 숫자로 인식해서 끝에 '.0'을 붙였다면 제거
+                if phone_raw.endswith(".0"):
+                    phone_raw = phone_raw[:-2]
+                    
+                # 2. 맨 앞의 '0'이 날아갔다면 다시 붙여주기 (한국 번호는 무조건 0으로 시작)
+                if phone_raw and not phone_raw.startswith("0"):
+                    phone_raw = "0" + phone_raw
+                    
+                phone = phone_raw
             
             existing = db.query(models.Customer).filter(
                 models.Customer.name == name,
@@ -84,14 +101,15 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
             
             refined_address = re.sub(r'\(.*?\)', '', raw_address)
             refined_address = re.sub(r'\s+', ' ', refined_address).strip()
-            
             lat, lng = get_coordinates_via_kakao(refined_address)
             
             db_customer = models.Customer(
                 name=name,
                 address=raw_address,
                 latitude=lat,
-                longitude=lng
+                longitude=lng,
+                phone=phone,      
+                status="미컨택"   
             )
             db.add(db_customer)
             
@@ -101,6 +119,35 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"서버 내부 오류: {str(e)}")
+
+# 💡 상태 저장 API 신설
+@app.put("/api/customers/{customer_id}/status")
+def update_customer_status(customer_id: int, payload: StatusUpdateRequest, db: Session = Depends(get_db)):
+    customer = db.query(models.Customer).filter(models.Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="고객을 찾을 수 없습니다.")
+    
+    customer.status = payload.status
+    db.commit()
+    return {"success": True}
+
+@app.get("/api/customers")
+def get_customers(db: Session = Depends(get_db)):
+    all_customers = db.query(models.Customer).all()
+    success_list = []
+    failed_list = []
+    for c in all_customers:
+        if c.latitude is not None and c.longitude is not None:
+            success_list.append({
+                "id": c.id, "name": c.name, "address": c.address,
+                "latitude": c.latitude, "longitude": c.longitude,
+                "phone": c.phone, "status": c.status  # 💡 반환값 추가
+            })
+        else:
+            failed_list.append({
+                "id": c.id, "row": 0, "name": c.name, "address": c.address
+            })
+    return {"success_list": success_list, "failed_list": failed_list}
 
 @app.put("/api/customers/{customer_id}")
 def update_customer_address(customer_id: int, payload: AddressUpdateRequest, db: Session = Depends(get_db)):

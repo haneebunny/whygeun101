@@ -1,18 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Hero from "@/components/Hero";
 import ExcelUploader from "@/components/ExcelUploader";
 import KakaoMap from "@/components/KakaoMap";
 import CustomerList from "@/components/CustomerList";
+import BottomNav from "@/components/BottomNav";
 import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
   const IS_DEV = process.env.NODE_ENV === "development";
-
   const BACKEND_IP = IS_DEV
     ? "172.30.103.23:8000"
     : "sales-map-db.onrender.com";
 
+  const [activeTab, setActiveTab] = useState<string>("home");
   const [successCustomers, setSuccessCustomers] = useState<Customer[]>([]);
   const [failedCustomers, setFailedCustomers] = useState<FailedCustomer[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
@@ -28,15 +30,13 @@ export default function Home() {
         setFailedCustomers(data.failed_list || []);
       }
     } catch (error) {
-      console.error("고객 리스트 패칭 오류:", error);
+      console.error(error);
     }
   };
 
   const handleEditSubmit = async (customerId: number) => {
     if (!editText.trim()) return;
-
     try {
-      // 💡 [교정] 프로토콜 스위칭 주입
       const protocol = IS_DEV ? "http" : "https";
       const response = await fetch(
         `${protocol}://${BACKEND_IP}/api/customers/${customerId}`,
@@ -46,31 +46,23 @@ export default function Home() {
           body: JSON.stringify({ address: editText }),
         },
       );
-
       if (response.ok) {
         const resData = await response.json();
         if (resData.success) {
-          alert(
-            `${resData.customer.name} 님의 좌표가 성공적으로 등록되었습니다!`,
-          );
           setEditId(null);
           fetchCustomers();
         } else {
-          alert(
-            "수정된 주소로도 카카오 좌표를 찾지 못했습니다. 주소를 다시 확인해 주세요.",
-          );
+          alert("수정된 주소로도 좌표를 찾지 못했습니다.");
         }
       }
     } catch (e) {
-      alert("주소 수정 처리 중 오류가 발생했습니다.");
+      alert("오류가 발생했습니다.");
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("이 고객을 지도와 목록에서 제거하시겠습니까?")) return;
-
+    if (!confirm("삭제하시겠습니까?")) return;
     try {
-      // 💡 [교정] 프로토콜 스위칭을 완벽히 주입하여 Failed to fetch 버그 원천 차단
       const protocol = IS_DEV ? "http" : "https";
       const response = await fetch(
         `${protocol}://${BACKEND_IP}/api/customers/${id}`,
@@ -78,97 +70,160 @@ export default function Home() {
           method: "DELETE",
         },
       );
-
-      if (response.ok) {
-        fetchCustomers(); // 디비 삭제 완수 후 클라이언트 데이터 실시간 재싱크
-      } else {
-        alert("삭제에 실패했습니다.");
-      }
+      if (response.ok) fetchCustomers();
     } catch (error) {
-      console.error("삭제 오류:", error);
+      console.error(error);
     }
   };
 
   useEffect(() => {
     fetchCustomers();
-    // 💡 분리된 KakaoMap 컴포넌트 내 인라인 HTML 클릭 리스너가 추적할 수 있도록 전역 객체 바인딩
     (window as any).handleDeleteCustomer = handleDelete;
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 flex flex-col gap-6 max-w-md mx-auto">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-          Sales Route Map
-        </h1>
-        <p className="text-xs text-slate-500">
-          영업 동선 효율화를 위한 위치 기반 내비게이션
-        </p>
+    <div className="min-h-screen bg-[#f5f7fa] flex flex-col max-w-md mx-auto relative shadow-2xl overflow-x-hidden">
+      <header className="flex justify-between items-center px-5 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          className="text-slate-600"
+        >
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+        <div className="flex items-center gap-1 text-blue-600">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
+        </div>
+        <div className="flex items-center gap-4 text-slate-600">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
       </header>
 
-      <ExcelUploader onUploadSuccess={fetchCustomers} backendIp={BACKEND_IP} />
+      {activeTab === "home" ? (
+        <main className="flex flex-col gap-6 p-5 pb-28">
+          <Hero />
 
-      {failedCustomers.length > 0 && (
-        <div className="flex flex-col gap-2 p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-sm shadow-sm">
-          <div className="font-bold text-xs">
-            ⚠️ 주소 불일치 실패 목록 ({failedCustomers.length}건)
-          </div>
-          <p className="text-[11px] text-rose-600/80 mb-1">
-            새로고침을 해도 보정 전까지 목록이 상시 유지됩니다.
-          </p>
-          <ul className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-            {failedCustomers.map((item) => (
-              <li
-                key={`persistent-failed-${item.id}`}
-                className="text-xs border-b border-rose-100/60 pb-2 flex flex-col gap-1.5"
-              >
-                <div>
-                  <strong>{item.name}</strong> -{" "}
-                  <span className="text-slate-600">{item.address}</span>
-                </div>
-
-                {editId === item.id ? (
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      className="flex-1 px-2 py-1 rounded border border-slate-300 text-slate-800 text-xs focus:outline-none"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                    />
-                    <button
-                      onClick={() => handleEditSubmit(item.id)}
-                      className="px-2 py-1 bg-emerald-600 text-white font-bold rounded text-xs whitespace-nowrap"
-                    >
-                      확인
-                    </button>
-                    <button
-                      onClick={() => setEditId(null)}
-                      className="px-2 py-1 bg-slate-400 text-white rounded text-xs whitespace-nowrap"
-                    >
-                      취소
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setEditId(item.id);
-                      setEditText(item.address);
-                    }}
-                    className="self-start text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200"
+          {failedCustomers.length > 0 && (
+            <div className="flex flex-col gap-3 p-4 bg-rose-50 border border-rose-100 rounded-2xl shadow-sm">
+              <div className="font-bold text-sm text-rose-700">
+                ⚠️ 주소 불일치 실패 목록 ({failedCustomers.length}건)
+              </div>
+              <ul className="flex flex-col gap-3 max-h-48 overflow-y-auto">
+                {failedCustomers.map((item) => (
+                  <li
+                    key={item.id}
+                    className="text-xs border-b border-rose-100 pb-3 flex flex-col gap-2"
                   >
-                    ✏️ 이 주소 수동 보정하기
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex flex-col gap-0.5">
+                        <strong className="text-slate-800 text-sm">
+                          {item.name}
+                        </strong>
+                        <span className="text-slate-500">{item.address}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditId(item.id);
+                          setEditText(item.address);
+                        }}
+                        className="text-slate-400 hover:text-blue-600 p-1 bg-white rounded shadow-sm border border-slate-200"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M12 20h9"></path>
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                    {editId === item.id && (
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          type="text"
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                        />
+                        <button
+                          onClick={() => handleEditSubmit(item.id)}
+                          className="px-3 py-1.5 bg-emerald-500 text-white font-bold rounded-lg"
+                        >
+                          확인
+                        </button>
+                        <button
+                          onClick={() => setEditId(null)}
+                          className="px-3 py-1.5 bg-slate-400 text-white rounded-lg"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <ExcelUploader
+            onUploadSuccess={fetchCustomers}
+            backendIp={BACKEND_IP}
+          />
+          <KakaoMap
+            customers={successCustomers}
+            onExpand={() => setActiveTab("map")}
+            backendIp={BACKEND_IP}
+          />
+          <CustomerList
+            customers={successCustomers}
+            handleDelete={handleDelete}
+          />
+        </main>
+      ) : (
+        <main className="w-full h-[calc(100vh-140px)] relative">
+          <KakaoMap
+            customers={successCustomers}
+            isFullScreen={true}
+            backendIp={BACKEND_IP}
+          />
+        </main>
       )}
 
-      {/* 💡 정돈된 성공 고객 배열을 깔끔하게 각 컴포넌트로 단방향 주입 */}
-      <KakaoMap customers={successCustomers} />
-
-      <CustomerList customers={successCustomers} handleDelete={handleDelete} />
-    </main>
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+    </div>
   );
 }

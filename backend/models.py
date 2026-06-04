@@ -9,3 +9,5 @@ class Customer(Base):
     address = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
+    phone = Column(String, nullable=True)
+    status = Column(String, default="미컨택")
