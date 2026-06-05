@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 "use client";
 
 import React, { useState } from "react";
@@ -32,17 +31,13 @@ export default function CustomerList({
     return phone;
   };
 
-  // 💡 카테고리별 필터링 로직 (hangul-js 적용)
   const filteredCustomers = validCustomers.filter((c) => {
     if (!searchTerm) return true;
 
-    // Hangul.search('안희지', '않') -> 일치하면 인덱스(0), 없으면 -1을 반환함!
     const matchName = c.name ? Hangul.search(c.name, searchTerm) !== -1 : false;
     const matchAddress = c.address
       ? Hangul.search(c.address, searchTerm) !== -1
       : false;
-
-    // 전화번호는 숫자니까 하이픈을 빼고 단순 포함 여부만 비교
     const termForPhone = searchTerm.replace(/-/g, "");
     const matchPhone = c.phone
       ? c.phone.replace(/-/g, "").includes(termForPhone)
@@ -52,7 +47,6 @@ export default function CustomerList({
     if (searchCategory === "address") return matchAddress;
     if (searchCategory === "phone") return matchPhone;
 
-    // 전체 검색
     return matchName || matchAddress || matchPhone;
   });
 
@@ -193,26 +187,33 @@ export default function CustomerList({
                     {customer.address}
                   </span>
 
+                  {/* 💡 전화번호 클릭 시 전화 걸기 연동 (tel:) */}
                   {customer.phone && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="10"
-                        height="10"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-slate-400"
-                      >
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                      </svg>
-                      <span className="text-[10px] font-medium text-slate-500">
+                    <a
+                      href={`tel:${customer.phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 mt-0.5 w-fit hover:opacity-70 active:opacity-50 transition"
+                    >
+                      <div className="bg-slate-100 p-1 rounded">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-slate-500"
+                        >
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600 border-b border-transparent hover:border-slate-400">
                         {formatPhoneNumber(customer.phone)}
                       </span>
-                    </div>
+                    </a>
                   )}
                 </div>
               </div>
@@ -224,7 +225,6 @@ export default function CustomerList({
                     handleNaviOpen("tmap", customer);
                   }}
                   className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition shadow-sm text-xs font-black"
-                  title="티맵"
                 >
                   T
                 </button>
@@ -234,7 +234,6 @@ export default function CustomerList({
                     handleNaviOpen("nmap", customer);
                   }}
                   className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition shadow-sm text-xs font-black"
-                  title="네이버"
                 >
                   N
                 </button>
@@ -244,7 +243,6 @@ export default function CustomerList({
                     handleDelete(customer.id);
                   }}
                   className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition shadow-sm"
-                  title="삭제"
                 >
                   <svg
                     width="14"

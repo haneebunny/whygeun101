@@ -11,9 +11,7 @@ import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
   const IS_DEV = process.env.NODE_ENV === "development";
-  const BACKEND_IP = IS_DEV
-    ? "172.30.103.23:8000"
-    : "sales-map-db.onrender.com";
+  const BACKEND_IP = IS_DEV ? "localhost:8000" : "sales-map-db.onrender.com";
 
   const [activeTab, setActiveTab] = useState<string>("home");
   const [successCustomers, setSuccessCustomers] = useState<Customer[]>([]);
@@ -23,14 +21,15 @@ export default function Home() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // 💡 닉네임을 저장할 상태 추가
   const [nickname, setNickname] = useState<string>("");
+  const [isFetching, setIsFetching] = useState(false);
+
+  // 💡 실패 목록 아코디언 열림/닫힘 상태
+  const [isFailedListOpen, setIsFailedListOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const storedNickname = localStorage.getItem("nickname"); // 💡 금고에서 닉네임 꺼내기
-
+    const storedNickname = localStorage.getItem("nickname");
     if (token) {
       setIsLoggedIn(true);
       if (storedNickname) setNickname(storedNickname);
@@ -38,14 +37,10 @@ export default function Home() {
     setIsLoading(false);
   }, []);
 
-  // 💡 로그아웃 기능 추가
   const handleLogout = () => {
     if (!confirm("로그아웃 하시겠습니까?")) return;
-
     localStorage.removeItem("token");
     localStorage.removeItem("nickname");
-
-    // 상태 초기화해서 로그인 화면으로 돌아가게 만들기
     setIsLoggedIn(false);
     setNickname("");
     setSuccessCustomers([]);
@@ -53,6 +48,7 @@ export default function Home() {
   };
 
   const fetchCustomers = async () => {
+    setIsFetching(true);
     try {
       const token = localStorage.getItem("token");
       const protocol = IS_DEV ? "http" : "https";
@@ -69,6 +65,8 @@ export default function Home() {
       }
     } catch (error) {
       console.error(error);
+    } finally {
+      setIsFetching(false);
     }
   };
 
@@ -132,12 +130,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] flex flex-col max-w-md mx-auto relative shadow-2xl overflow-x-hidden">
-      {/* 💡 헤더(Header) 영역 수정: 닉네임과 로그아웃 버튼 추가 */}
-      <header className="flex justify-between items-center px-5 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="flex justify-between items-center px-5 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-100">
         <div className="flex items-center gap-1.5 text-blue-600">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-          </svg>
+          <img src="/icon.png" alt="logo" className="w-5 h-5 object-contain" />
           <span className="font-black text-[15px] text-slate-800 tracking-tight">
             외근의 정석
           </span>
@@ -162,69 +157,15 @@ export default function Home() {
         <main className="flex flex-col gap-6 p-5 pb-28">
           <Hero />
 
-          {failedCustomers.length > 0 && (
-            <div className="flex flex-col gap-3 p-4 bg-rose-50 border border-rose-100 rounded-2xl shadow-sm">
-              <div className="font-bold text-sm text-rose-700">
-                ⚠️ 주소 불일치 실패 목록 ({failedCustomers.length}건)
-              </div>
-              <ul className="flex flex-col gap-3 max-h-48 overflow-y-auto">
-                {failedCustomers.map((item) => (
-                  <li
-                    key={item.id}
-                    className="text-xs border-b border-rose-100 pb-3 flex flex-col gap-2"
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex flex-col gap-0.5">
-                        <strong className="text-slate-800 text-sm">
-                          {item.name}
-                        </strong>
-                        <span className="text-slate-500">{item.address}</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setEditId(item.id);
-                          setEditText(item.address);
-                        }}
-                        className="text-slate-400 hover:text-blue-600 p-1 bg-white rounded shadow-sm border border-slate-200"
-                      >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path d="M12 20h9"></path>
-                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                        </svg>
-                      </button>
-                    </div>
-                    {editId === item.id && (
-                      <div className="flex gap-2 mt-1">
-                        <input
-                          type="text"
-                          className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none"
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                        />
-                        <button
-                          onClick={() => handleEditSubmit(item.id)}
-                          className="px-3 py-1.5 bg-emerald-500 text-white font-bold rounded-lg"
-                        >
-                          확인
-                        </button>
-                        <button
-                          onClick={() => setEditId(null)}
-                          className="px-3 py-1.5 bg-slate-400 text-white rounded-lg"
-                        >
-                          취소
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
+          {isFetching && successCustomers.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-100 border-t-blue-600 mb-4"></div>
+              <p className="text-[13px] font-bold text-slate-700">
+                서버를 깨우고 데이터를 불러오는 중...
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                무료 서버라 최대 1분 정도 걸릴 수 있어요 😴
+              </p>
             </div>
           )}
 
@@ -237,6 +178,86 @@ export default function Home() {
             onExpand={() => setActiveTab("map")}
             backendIp={BACKEND_IP}
           />
+
+          {/* 💡 실패 목록 아코디언 (지도 밑으로 이동) */}
+          {failedCustomers.length > 0 && (
+            <div className="flex flex-col gap-3 p-4 bg-white border border-rose-100 rounded-2xl shadow-sm">
+              <button
+                onClick={() => setIsFailedListOpen(!isFailedListOpen)}
+                className="flex justify-between items-center w-full text-left"
+              >
+                <div className="font-bold text-sm text-rose-600 flex items-center gap-1.5">
+                  <span className="w-5 h-5 flex items-center justify-center bg-rose-100 rounded-full text-xs">
+                    ⚠️
+                  </span>
+                  주소 오류 목록 ({failedCustomers.length}건)
+                </div>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={`text-slate-400 transition-transform ${isFailedListOpen ? "rotate-180" : ""}`}
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+
+              {isFailedListOpen && (
+                <ul className="flex flex-col gap-3 max-h-60 overflow-y-auto mt-2 pt-2 border-t border-rose-50">
+                  {failedCustomers.map((item) => (
+                    <li
+                      key={item.id}
+                      className="text-xs pb-3 flex flex-col gap-2 border-b border-slate-50 last:border-0"
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex flex-col gap-0.5">
+                          <strong className="text-slate-800 text-sm">
+                            {item.name}
+                          </strong>
+                          <span className="text-slate-500">{item.address}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setEditId(item.id);
+                            setEditText(item.address);
+                          }}
+                          className="text-slate-400 hover:text-blue-600 p-1.5 bg-slate-50 rounded-lg border border-slate-100"
+                        >
+                          수정
+                        </button>
+                      </div>
+                      {editId === item.id && (
+                        <div className="flex gap-2 mt-1">
+                          <input
+                            type="text"
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-800 focus:outline-none focus:border-blue-300"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                          />
+                          <button
+                            onClick={() => handleEditSubmit(item.id)}
+                            className="px-3 py-1.5 bg-emerald-500 text-white font-bold rounded-lg"
+                          >
+                            확인
+                          </button>
+                          <button
+                            onClick={() => setEditId(null)}
+                            className="px-3 py-1.5 bg-slate-300 text-white rounded-lg"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <CustomerList
             customers={successCustomers}
             handleDelete={handleDelete}

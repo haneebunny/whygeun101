@@ -20,4 +20,6 @@ export interface Customer {
   longitude: number | null;
   phone?: string;
   status?: string;
+  model_name?: string;
+  service_type?: string;
 }

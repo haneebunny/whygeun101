@@ -10,9 +10,7 @@ function CallbackContent() {
 
   const IS_DEV = process.env.NODE_ENV === "development";
   // 💡 메인 페이지에서 쓰던 내 백엔드 아이피 그대로 사용!
-  const BACKEND_IP = IS_DEV
-    ? "172.30.103.23:8000"
-    : "sales-map-db.onrender.com";
+  const BACKEND_IP = IS_DEV ? "localhost:8000" : "sales-map-db.onrender.com";
   const protocol = IS_DEV ? "http" : "https";
 
   useEffect(() => {

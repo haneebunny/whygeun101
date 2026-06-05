@@ -93,6 +93,7 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
             
         phone_col = '휴대폰번호' if '휴대폰번호' in df.columns else '전화번호' if '전화번호' in df.columns else None
         
+        # 💡 for 반복문 시작! (여기 안쪽에 코드들이 쏙 들어가야 해!)
         for index, row in df.iterrows():
             name = str(row['실사용자명']).strip()
             raw_address = str(row['주소']).strip()
@@ -106,7 +107,11 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
                     phone_raw = "0" + phone_raw
                 phone = phone_raw
             
-            # 💡 내(current_user) 데이터 중에 중복이 있는지 확인
+            # 💡 모델명 & 서비스 타입 가져오기 (들여쓰기 완벽!)
+            model_name = str(row['모델명']).strip() if '모델명' in df.columns and pd.notna(row['모델명']) else ""
+            service_type = str(row['서비스 타입']).strip() if '서비스 타입' in df.columns and pd.notna(row['서비스 타입']) else ""
+            
+            # 내 데이터 중에 중복이 있는지 확인
             existing = db.query(models.Customer).filter(
                 models.Customer.name == name,
                 models.Customer.address == raw_address,
@@ -127,7 +132,9 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
                 longitude=lng,
                 phone=phone,      
                 status="미컨택",
-                user_id=current_user.id  # 💡 누구의 고객인지 이름표 붙이기!
+                model_name=model_name,       # 추가됨!
+                service_type=service_type,   # 추가됨!
+                user_id=current_user.id
             )
             db.add(db_customer)
             
@@ -136,6 +143,8 @@ async def upload_excel(file: UploadFile = File(...), db: Session = Depends(get_d
 
     except Exception as e:
         db.rollback()
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"서버 내부 오류: {str(e)}")
 
 # 💡 상태 저장 API 신설
@@ -165,7 +174,9 @@ def get_customers(db: Session = Depends(get_db), current_user: models.User = Dep
             success_list.append({
                 "id": c.id, "name": c.name, "address": c.address,
                 "latitude": c.latitude, "longitude": c.longitude,
-                "phone": c.phone, "status": c.status
+                "phone": c.phone, "status": c.status,
+                "model_name": c.model_name,     
+                "service_type": c.service_type 
             })
         else:
             failed_list.append({

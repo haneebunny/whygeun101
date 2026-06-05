@@ -22,7 +22,10 @@ class Customer(Base):
     longitude = Column(Float, nullable=True)
     phone = Column(String, nullable=True)
     status = Column(String, default="미컨택")
+    model_name = Column(String, nullable=True)
+    service_type = Column(String, nullable=True)
     
     # 💡 이 고객이 어떤 유저의 데이터인지 저장하는 외래키
     user_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="customers")
+

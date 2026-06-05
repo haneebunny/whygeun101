@@ -7,7 +7,7 @@ interface KakaoMapProps {
   customers: Customer[];
   isFullScreen?: boolean;
   onExpand?: () => void;
-  backendIp: string; // 💡 API 통신용 IP 받기
+  backendIp: string;
 }
 
 export default function KakaoMap({
@@ -20,8 +20,13 @@ export default function KakaoMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<any>(null);
   const markerMapRef = useRef<{
-    [key: number]: { marker: any; popup: any; label: any };
+    [groupId: string]: { marker: any; popup: any; type: string };
   }>({});
+  const customerToGroupRef = useRef<{ [customerId: number]: string }>({});
+
+  const [isTracking, setIsTracking] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
+  const myLocMarkerRef = useRef<any>(null);
 
   useEffect(() => {
     const checkScript = setInterval(() => {
@@ -57,14 +62,16 @@ export default function KakaoMap({
       }
     };
 
-    // 💡 DB에 실시간 저장 로직 추가
-    (window as any).changeMarkerStatus = async (id: number, status: string) => {
-      const target = markerMapRef.current[id];
-      if (target && target.marker) {
+    (window as any).changeMarkerStatus = async (
+      id: number,
+      status: string,
+      groupId: string,
+    ) => {
+      const target = markerMapRef.current[groupId];
+      if (target && target.type === "single" && target.marker.setImage) {
         let imgSrc = "/images/marker_uncontacted.png";
         if (status === "컨택") imgSrc = "/images/marker_contacted.png";
         if (status === "완료") imgSrc = "/images/marker_completed.png";
-
         const newImage = new window.kakao.maps.MarkerImage(
           imgSrc,
           new window.kakao.maps.Size(20, 20),
@@ -72,15 +79,21 @@ export default function KakaoMap({
         target.marker.setImage(newImage);
       }
 
+      const badge = document.getElementById(`badge_${id}`);
+      if (badge) {
+        badge.innerText = status;
+        badge.className = `group-status-badge ${status === "완료" ? "done" : status === "컨택" ? "contact" : "none"}`;
+      }
+
       const protocol =
         process.env.NODE_ENV === "development" ? "http" : "https";
       try {
-        const token = localStorage.getItem("token"); // 👈 토큰 꺼내기
+        const token = localStorage.getItem("token");
         await fetch(`${protocol}://${backendIp}/api/customers/${id}/status`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // 👈 추가
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ status }),
         });
@@ -89,14 +102,57 @@ export default function KakaoMap({
       }
     };
 
-    (window as any).closeMarkerPopup = (id: number) => {
-      const target = markerMapRef.current[id];
+    (window as any).openMapPopup = (groupId: string) => {
+      if (!mapRef.current) return;
+      Object.values(markerMapRef.current).forEach(({ popup }) =>
+        popup.setMap(null),
+      );
+
+      const target = markerMapRef.current[groupId];
       if (target && target.popup) {
-        target.popup.setMap(null);
+        target.popup.setMap(mapRef.current);
+        const position = target.marker.getPosition();
+        mapRef.current.panTo(position);
       }
     };
 
-    return () => clearInterval(checkScript);
+    (window as any).closeMapPopup = (groupId: string) => {
+      const target = markerMapRef.current[groupId];
+      if (target && target.popup) target.popup.setMap(null);
+    };
+
+    (window as any).toggleGroupItem = (id: number) => {
+      const body = document.getElementById(`group_body_${id}`);
+      const arrow = document.getElementById(`group_arrow_${id}`);
+      if (body && arrow) {
+        if (body.style.display === "none") {
+          body.style.display = "block";
+          arrow.style.transform = "rotate(180deg)";
+        } else {
+          body.style.display = "none";
+          arrow.style.transform = "rotate(0deg)";
+        }
+      }
+    };
+
+    (window as any).focusCustomerMarker = (id: number) => {
+      const groupId = customerToGroupRef.current[id];
+      if (groupId) {
+        (window as any).openMapPopup(groupId);
+        setTimeout(() => {
+          const body = document.getElementById(`group_body_${id}`);
+          if (body && body.style.display === "none") {
+            (window as any).toggleGroupItem(id);
+          }
+        }, 100);
+      }
+    };
+
+    return () => {
+      clearInterval(checkScript);
+      if (watchIdRef.current)
+        navigator.geolocation.clearWatch(watchIdRef.current);
+    };
   }, [backendIp]);
 
   useEffect(() => {
@@ -104,14 +160,12 @@ export default function KakaoMap({
     window.kakao.maps.load(() => {
       const validCustomers = customers.filter((c) => c.latitude && c.longitude);
 
-      Object.values(markerMapRef.current).forEach(
-        ({ marker, popup, label }) => {
-          marker.setMap(null);
-          if (popup) popup.setMap(null);
-          if (label) label.setMap(null);
-        },
-      );
+      Object.values(markerMapRef.current).forEach(({ marker, popup }) => {
+        marker.setMap(null);
+        if (popup) popup.setMap(null);
+      });
       markerMapRef.current = {};
+      customerToGroupRef.current = {};
 
       const defaultCenter =
         validCustomers.length > 0
@@ -130,146 +184,375 @@ export default function KakaoMap({
 
       const bounds = new window.kakao.maps.LatLngBounds();
 
-      validCustomers.forEach((customer) => {
-        const markerPosition = new window.kakao.maps.LatLng(
-          customer.latitude,
-          customer.longitude,
-        );
+      const grouped: { [key: string]: Customer[] } = {};
+      validCustomers.forEach((c) => {
+        const key = `${c.latitude.toFixed(5)}_${c.longitude.toFixed(5)}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(c);
+      });
 
-        // 💡 DB에서 가져온 상태값 반영
-        const currentStatus = customer.status || "미컨택";
+      const extractBuildingName = (address: string) => {
+        if (!address) return "같은 주소 고객";
+        const parenMatch = address.match(/\(([^)]+)\)/);
+        if (parenMatch) {
+          const parts = parenMatch[1].split(",");
+          const possibleName = parts[parts.length - 1].trim();
+          if (
+            !possibleName.endsWith("동") &&
+            !possibleName.endsWith("읍") &&
+            !possibleName.endsWith("면")
+          )
+            return possibleName;
+        }
+        const words = address.split(" ");
+        const lastWord = words[words.length - 1];
+        if (
+          /(아파트|빌딩|빌라|타워|상가|센터|오피스텔|맨션|원룸)$/.test(lastWord)
+        )
+          return lastWord;
+        if (words.length >= 2)
+          return `${words[words.length - 2]} ${words[words.length - 1]}`
+            .replace(/\(.*?\)/g, "")
+            .trim();
+        return address;
+      };
 
-        let defaultImgSrc = "/images/marker_uncontacted.png";
-        if (currentStatus === "컨택")
-          defaultImgSrc = "/images/marker_contacted.png";
-        if (currentStatus === "완료")
-          defaultImgSrc = "/images/marker_completed.png";
+      // 💡 1. 이모티콘 뺀 태그 생성 (서비스 타입 먼저, 그 다음 모델명)
+      const getTagsHTML = (c: Customer) => {
+        const serviceBadge = c.service_type
+          ? `<span class="tag-badge service-tag">${c.service_type}</span>`
+          : "";
+        const modelBadge = c.model_name
+          ? `<span class="tag-badge model-tag">${c.model_name}</span>`
+          : "";
+        if (!modelBadge && !serviceBadge) return "";
+        return `<div class="tags-container">${serviceBadge}${modelBadge}</div>`;
+      };
 
-        const markerImage = new window.kakao.maps.MarkerImage(
-          defaultImgSrc,
-          new window.kakao.maps.Size(20, 20),
-        );
-        const marker = new window.kakao.maps.Marker({
-          position: markerPosition,
-          image: markerImage,
-        });
-        marker.setMap(mapRef.current);
-        bounds.extend(markerPosition);
+      // 💡 2. 지도 마커에 표시할 텍스트 포맷! ([서비스][모델] 이름)
+      const getLabelText = (c: Customer) => {
+        const sType = c.service_type ? `[${c.service_type}] ` : "";
+        const mName = c.model_name ? `[${c.model_name}] ` : "";
+        return `${sType}${mName}${c.name}`;
+      };
 
-        const labelContent = `<div style="font-size:12px; font-weight:500; color:#21262e; text-shadow:-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; transform:translateY(1px); white-space:nowrap; letter-spacing:-0.5px;">${customer.name}</div>`;
-        const labelOverlay = new window.kakao.maps.CustomOverlay({
-          position: markerPosition,
-          content: labelContent,
-          yAnchor: 0,
-        });
-        labelOverlay.setMap(mapRef.current);
-
-        // 💡 DB에서 가져온 전화번호 연결 (없으면 빈칸)
+      const generateSingleHTML = (customer: Customer, groupId: string) => {
         const phoneLink = customer.phone ? customer.phone : "";
+        const isNoneChecked = customer.status === "미컨택" ? "checked" : "";
+        const isContactChecked = customer.status === "컨택" ? "checked" : "";
+        const isDoneChecked = customer.status === "완료" ? "checked" : "";
+        const statusClass =
+          customer.status === "완료"
+            ? "done"
+            : customer.status === "컨택"
+              ? "contact"
+              : "none";
 
-        const isNoneChecked = currentStatus === "미컨택" ? "checked" : "";
-        const isContactChecked = currentStatus === "컨택" ? "checked" : "";
-        const isDoneChecked = currentStatus === "완료" ? "checked" : "";
-
-        const contentString = `
-          <div class="custom-popup">
-            <button class="custom-popup-close" onclick="window.closeMarkerPopup(${customer.id})">✕</button>
-            
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; padding-right:20px;">
-              <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:85px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
+        // 💡 3. 주소 영역을 넓게 쓰고, 버튼들을 아래쪽으로 예쁘게 찢어놓은 단일 팝업!
+        return `
+          <div class="custom-popup single-popup">
+            <button class="custom-popup-close" onclick="window.closeMapPopup('${groupId}')">✕</button>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding-right:20px;">
+              <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
+              <span id="badge_${customer.id}" class="group-status-badge ${statusClass}">${customer.status || "미컨택"}</span>
+            </div>
+            ${getTagsHTML(customer)}
+            <div style="font-size:10px; color:#64748b; line-height:1.4; word-break:break-all; white-space:normal; flex:1; padding-right:8px;">
+  ${customer.address}
+</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
               <div style="display:flex; gap:4px;">
                 <a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화">📞</a>
                 <button onclick="window.handleNaviMap('tmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn tmap-btn" title="티맵">T</button>
                 <button onclick="window.handleNaviMap('nmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn nmap-btn" title="네이버">N</button>
               </div>
-            </div>
-            
-            <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:12px; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-              ${customer.address}
-            </div>
-
-            <div class="map-status-selector">
-              <input type="radio" id="status_none_${customer.id}" name="status_${customer.id}" value="미컨택" ${isNoneChecked} onclick="window.changeMarkerStatus(${customer.id}, '미컨택')">
-              <label for="status_none_${customer.id}">미컨택</label>
-              
-              <input type="radio" id="status_contact_${customer.id}" name="status_${customer.id}" value="컨택" ${isContactChecked} onclick="window.changeMarkerStatus(${customer.id}, '컨택')">
-              <label for="status_contact_${customer.id}">컨택</label>
-              
-              <input type="radio" id="status_done_${customer.id}" name="status_${customer.id}" value="완료" ${isDoneChecked} onclick="window.changeMarkerStatus(${customer.id}, '완료')">
-              <label for="status_done_${customer.id}">완료</label>
+              <div class="map-status-selector" style="margin-top:0; flex:1;">
+                <input type="radio" id="status_none_${customer.id}" name="status_${customer.id}" value="미컨택" ${isNoneChecked} onclick="window.changeMarkerStatus(${customer.id}, '미컨택', '${groupId}')">
+                <label for="status_none_${customer.id}">미컨택</label>
+                <input type="radio" id="status_contact_${customer.id}" name="status_${customer.id}" value="컨택" ${isContactChecked} onclick="window.changeMarkerStatus(${customer.id}, '컨택', '${groupId}')">
+                <label for="status_contact_${customer.id}">컨택</label>
+                <input type="radio" id="status_done_${customer.id}" name="status_${customer.id}" value="완료" ${isDoneChecked} onclick="window.changeMarkerStatus(${customer.id}, '완료', '${groupId}')">
+                <label for="status_done_${customer.id}">완료</label>
+              </div>
             </div>
           </div>
         `;
+      };
 
-        const popupOverlay = new window.kakao.maps.CustomOverlay({
-          content: contentString,
-          position: markerPosition,
-          xAnchor: 0.5,
-          yAnchor: 1,
-          zIndex: 10,
-        });
+      const generateGroupItemHTML = (customer: Customer, groupId: string) => {
+        const phoneLink = customer.phone ? customer.phone : "";
+        const isNoneChecked = customer.status === "미컨택" ? "checked" : "";
+        const isContactChecked = customer.status === "컨택" ? "checked" : "";
+        const isDoneChecked = customer.status === "완료" ? "checked" : "";
+        const statusClass =
+          customer.status === "완료"
+            ? "done"
+            : customer.status === "컨택"
+              ? "contact"
+              : "none";
 
-        markerMapRef.current[customer.id] = {
-          marker,
-          popup: popupOverlay,
-          label: labelOverlay,
-        };
+        // 💡 3-1. 주소 영역을 넓게 쓰고, 버튼들을 아래쪽으로 예쁘게 찢어놓은 그룹 아코디언!
+        return `
+          <div class="group-item">
+            <div class="group-item-header" onclick="window.toggleGroupItem(${customer.id})">
+              <div style="display:flex; flex-direction:column; gap:4px; max-width: 140px;">
+                <span class="group-item-name">${customer.name}</span>
+                ${getTagsHTML(customer)}
+              </div>
+              <div class="group-item-icons">
+                <span id="badge_${customer.id}" class="group-status-badge ${statusClass}">${customer.status || "미컨택"}</span>
+                <svg id="group_arrow_${customer.id}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+            </div>
+            
+            <div id="group_body_${customer.id}" style="display:none; padding-top:4px; padding-bottom:12px;">
+              <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:12px; word-break:break-all; white-space:normal;">
+  ${customer.address}
+</div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div style="display:flex; gap:4px;">
+                  <a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화">📞</a>
+                  <button onclick="window.handleNaviMap('tmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn tmap-btn" title="티맵">T</button>
+                  <button onclick="window.handleNaviMap('nmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn nmap-btn" title="네이버">N</button>
+                </div>
+                <div class="map-status-selector" style="margin-top:0; flex:1;">
+                  <input type="radio" id="status_none_${customer.id}" name="status_${customer.id}" value="미컨택" ${isNoneChecked} onclick="window.changeMarkerStatus(${customer.id}, '미컨택', '${groupId}')">
+                  <label for="status_none_${customer.id}">미컨택</label>
+                  <input type="radio" id="status_contact_${customer.id}" name="status_${customer.id}" value="컨택" ${isContactChecked} onclick="window.changeMarkerStatus(${customer.id}, '컨택', '${groupId}')">
+                  <label for="status_contact_${customer.id}">컨택</label>
+                  <input type="radio" id="status_done_${customer.id}" name="status_${customer.id}" value="완료" ${isDoneChecked} onclick="window.changeMarkerStatus(${customer.id}, '완료', '${groupId}')">
+                  <label for="status_done_${customer.id}">완료</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      };
 
-        window.kakao.maps.event.addListener(marker, "click", () => {
-          Object.values(markerMapRef.current).forEach(({ popup: p }) =>
-            p.setMap(null),
+      Object.values(grouped).forEach((group, index) => {
+        const groupId = `group_${index}`;
+        const markerPosition = new window.kakao.maps.LatLng(
+          group[0].latitude,
+          group[0].longitude,
+        );
+        bounds.extend(markerPosition);
+
+        group.forEach((c) => (customerToGroupRef.current[c.id] = groupId));
+
+        if (group.length === 1) {
+          const customer = group[0];
+          const currentStatus = customer.status || "미컨택";
+          let defaultImgSrc = "/images/marker_uncontacted.png";
+          if (currentStatus === "컨택")
+            defaultImgSrc = "/images/marker_contacted.png";
+          if (currentStatus === "완료")
+            defaultImgSrc = "/images/marker_completed.png";
+
+          const markerImage = new window.kakao.maps.MarkerImage(
+            defaultImgSrc,
+            new window.kakao.maps.Size(20, 20),
           );
-          popupOverlay.setMap(mapRef.current);
-          mapRef.current.panTo(markerPosition);
-        });
+          const markerOverlay = new window.kakao.maps.Marker({
+            position: markerPosition,
+            image: markerImage,
+          });
+          markerOverlay.setMap(mapRef.current);
+
+          // 💡 단일 마커에도 [서비스][모델명] 뜨게 적용 완료!
+          const labelContent = `<div class="marker-label">${getLabelText(customer)}</div>`;
+          const labelOverlay = new window.kakao.maps.CustomOverlay({
+            position: markerPosition,
+            content: labelContent,
+            yAnchor: -0.2,
+          });
+          labelOverlay.setMap(mapRef.current);
+
+          const popupOverlay = new window.kakao.maps.CustomOverlay({
+            content: generateSingleHTML(customer, groupId),
+            position: markerPosition,
+            xAnchor: 0.5,
+            yAnchor: 1.1,
+            zIndex: 10,
+          });
+
+          markerMapRef.current[groupId] = {
+            marker: markerOverlay,
+            popup: popupOverlay,
+            type: "single",
+          };
+          window.kakao.maps.event.addListener(markerOverlay, "click", () =>
+            (window as any).openMapPopup(groupId),
+          );
+        } else {
+          const baseSize = 28;
+          const extraSize = (group.length - 2) * 5;
+          const size = Math.min(baseSize + extraSize, 50);
+          const fontSize = Math.min(12 + (group.length - 2), 16);
+
+          const groupMarkerContent = `<div class="group-marker" style="width:${size}px; height:${size}px; font-size:${fontSize}px;" onclick="window.openMapPopup('${groupId}')">${group.length}</div>`;
+          const markerOverlay = new window.kakao.maps.CustomOverlay({
+            position: markerPosition,
+            content: groupMarkerContent,
+            yAnchor: 0.5,
+            xAnchor: 0.5,
+          });
+          markerOverlay.setMap(mapRef.current);
+
+          const listHTML = group
+            .map((c) => generateGroupItemHTML(c, groupId))
+            .join("");
+          const popupContent = `
+            <div class="custom-popup group-popup">
+              <div class="group-popup-header">
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;" title="${group[0].address}">
+                  📍 ${extractBuildingName(group[0].address)} (${group.length}명)
+                </span>
+                <button onclick="window.closeMapPopup('${groupId}')">✕</button>
+              </div>
+              <div class="group-popup-list">${listHTML}</div>
+            </div>
+          `;
+          const popupOverlay = new window.kakao.maps.CustomOverlay({
+            content: popupContent,
+            position: markerPosition,
+            xAnchor: 0.5,
+            yAnchor: 1.1,
+            zIndex: 10,
+          });
+
+          markerMapRef.current[groupId] = {
+            marker: markerOverlay,
+            popup: popupOverlay,
+            type: "group",
+          };
+        }
       });
 
       if (validCustomers.length > 0 && mapRef.current)
         mapRef.current.setBounds(bounds);
-
-      (window as any).focusCustomerMarker = (id: number) => {
-        const target = markerMapRef.current[id];
-        if (!target || !mapRef.current) return;
-        Object.values(markerMapRef.current).forEach(({ popup: p }) =>
-          p.setMap(null),
-        );
-        mapRef.current.panTo(target.marker.getPosition());
-        target.popup.setMap(mapRef.current);
-      };
     });
   }, [mapLoaded, customers, isFullScreen]);
+
+  const toggleLocationTracking = () => {
+    if (!navigator.geolocation) {
+      alert("현재 기기에서 위치 추적을 지원하지 않습니다.");
+      return;
+    }
+    if (isTracking) {
+      navigator.geolocation.clearWatch(watchIdRef.current!);
+      if (myLocMarkerRef.current) myLocMarkerRef.current.setMap(null);
+      setIsTracking(false);
+    } else {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const locPosition = new window.kakao.maps.LatLng(lat, lon);
+          if (!myLocMarkerRef.current) {
+            const content = `<div class="my-loc-dot"><div class="my-loc-pulse"></div></div>`;
+            myLocMarkerRef.current = new window.kakao.maps.CustomOverlay({
+              position: locPosition,
+              content: content,
+              xAnchor: 0.5,
+              yAnchor: 0.5,
+              zIndex: 30,
+            });
+          } else {
+            myLocMarkerRef.current.setPosition(locPosition);
+          }
+          myLocMarkerRef.current.setMap(mapRef.current);
+          mapRef.current.panTo(locPosition);
+        },
+        (error) => alert("위치를 가져올 수 없습니다. 권한을 확인해주세요."),
+        { enableHighAccuracy: true },
+      );
+      setIsTracking(true);
+    }
+  };
 
   return (
     <>
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        .custom-popup { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 12px 14px; width: 220px; position: relative; bottom: 8px; border: 1px solid #e2e8f0; font-family: sans-serif; box-sizing: border-box; }
+        .group-marker { background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2.5px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s; }
+        .group-marker:active { transform: scale(0.9); }
+        .marker-label { font-size: 12px; font-weight: 500; color: #21262e; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; letter-spacing: -0.5px; }
+
+        /* 💡 너비를 240px로 아주 살짝 늘렸어요! */
+        .custom-popup { background: white; border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; font-family: sans-serif; box-sizing: border-box; width: 240px; position: relative; bottom: 12px; }
         .custom-popup::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 6px 6px 0; border-style: solid; border-color: white transparent transparent transparent; }
-        
-        .custom-popup-close { position: absolute; right: 8px; top: 8px; width: 20px; height: 20px; background: transparent; border: none; font-size: 13px; font-weight: bold; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .single-popup { padding: 12px 14px; }
+        .custom-popup-close { position: absolute; right: 8px; top: 8px; width: 20px; height: 20px; background: transparent; border: none; font-size: 13px; font-weight: bold; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; z-index: 20; }
         .custom-popup-close:hover { color: #334155; }
+
+        .group-popup { overflow: hidden; display: flex; flex-direction: column; max-height: 220px; width: 240px; }
+        .group-popup-header { background: #f8fafc; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; font-weight: 800; font-size: 12px; color: #1e293b; }
+        .group-popup-header button { background: none; border: none; font-size: 13px; font-weight: bold; color: #94a3b8; cursor: pointer; }
         
+        .group-popup-list { padding: 0 14px; overflow-y: auto; display: flex; flex-direction: column; }
+        .group-popup-list::-webkit-scrollbar { width: 4px; }
+        .group-popup-list::-webkit-scrollbar-track { background: transparent; }
+        .group-popup-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        .group-item { border-bottom: 1px dashed #cbd5e1; }
+        .group-item:last-child { border-bottom: none; }
+        .group-item-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; cursor: pointer; user-select: none; }
+        .group-item-name { font-weight: 800; font-size: 13px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; margin-bottom: 2px; }
+        .group-item-icons { display: flex; align-items: center; gap: 6px; color: #94a3b8; margin-top: 2px; }
+        
+        .tags-container { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+        .tag-badge { font-size: 9.5px; font-weight: 800; padding: 2px 5px; border-radius: 4px; letter-spacing: -0.3px; }
+        .model-tag { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+        .service-tag { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+
+        .group-status-badge { font-size: 9px; padding: 3px 5px; border-radius: 4px; font-weight: bold; line-height: 1; }
+        .group-status-badge.done { background: #dbeafe; color: #2563eb; }
+        .group-status-badge.contact { background: #fef3c7; color: #d97706; }
+        .group-status-badge.none { background: #fee2e2; color: #ef4444; }
+
         .circle-btn { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; text-decoration: none; cursor: pointer; border: 1px solid transparent; padding: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .phone-btn { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
         .tmap-btn { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
         .nmap-btn { background: #ecfdf5; border-color: #a7f3d0; color: #10b981; }
-
+        
         .map-status-selector { display: flex; gap: 2px; background: #f1f5f9; padding: 2px; border-radius: 6px; }
         .map-status-selector input[type="radio"] { display: none; }
         .map-status-selector label { flex: 1; text-align: center; font-size: 10px; font-weight: 700; padding: 4px 0; border-radius: 4px; cursor: pointer; color: #94a3b8; transition: all 0.2s ease; }
-        
         .map-status-selector input[value="미컨택"]:checked + label { background: #ef4444; color: #fff; box-shadow: 0 1px 3px rgba(239,68,68,0.3); }
         .map-status-selector input[value="컨택"]:checked + label { background: #eab308; color: #fff; box-shadow: 0 1px 3px rgba(234,179,8,0.3); }
         .map-status-selector input[value="완료"]:checked + label { background: #3b82f6; color: #fff; box-shadow: 0 1px 3px rgba(59,130,246,0.3); }
+
+        .my-loc-dot { width: 14px; height: 14px; background-color: #2563eb; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; }
+        .my-loc-pulse { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; border-radius: 50%; background-color: rgba(37, 99, 235, 0.4); animation: pulse-anim 1.5s infinite ease-out; pointer-events: none; }
+        @keyframes pulse-anim { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
       `,
         }}
       />
 
       {isFullScreen ? (
-        <div ref={mapContainer} className="w-full h-full bg-slate-100" />
+        <div ref={mapContainer} className="w-full h-full bg-slate-100 relative">
+          <button
+            onClick={toggleLocationTracking}
+            className={`absolute bottom-6 right-4 z-10 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors ${isTracking ? "bg-blue-600 text-white" : "bg-white text-slate-700"}`}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
       ) : (
-        <div className="flex flex-col gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex flex-col gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 relative">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <svg
@@ -301,14 +584,33 @@ export default function KakaoMap({
                 strokeWidth="2"
               >
                 <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"></path>
-              </svg>
+              </svg>{" "}
               전체 보기
             </button>
           </div>
+
           <div
             ref={mapContainer}
-            className="w-full h-64 bg-slate-100 rounded-xl shadow-inner border border-slate-200 overflow-hidden relative"
-          />
+            className="w-full h-[360px] bg-slate-100 rounded-xl shadow-inner border border-slate-200 overflow-hidden relative"
+          >
+            <button
+              onClick={toggleLocationTracking}
+              className={`absolute bottom-4 right-4 z-10 w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-colors ${isTracking ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+              title="내 위치 추적"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
     </>
