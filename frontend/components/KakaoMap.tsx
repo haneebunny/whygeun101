@@ -217,7 +217,6 @@ export default function KakaoMap({
         return address;
       };
 
-      // 💡 1. 이모티콘 뺀 태그 생성 (서비스 타입 먼저, 그 다음 모델명)
       const getTagsHTML = (c: Customer) => {
         const serviceBadge = c.service_type
           ? `<span class="tag-badge service-tag">${c.service_type}</span>`
@@ -229,11 +228,36 @@ export default function KakaoMap({
         return `<div class="tags-container">${serviceBadge}${modelBadge}</div>`;
       };
 
-      // 💡 2. 지도 마커에 표시할 텍스트 포맷! ([서비스][모델] 이름)
-      const getLabelText = (c: Customer) => {
-        const sType = c.service_type ? `[${c.service_type}] ` : "";
-        const mName = c.model_name ? `[${c.model_name}] ` : "";
-        return `${sType}${mName}${c.name}`;
+      const getShortServiceType = (type: string) => {
+        if (!type) return "";
+        if (type.includes("라이트 플러스")) return "라플";
+        if (type.includes("라이트")) return "라";
+        if (type.includes("기본")) return "기";
+        return type.substring(0, 2);
+      };
+
+      // 💡 지도 마커에 띄울 2줄짜리 깔끔한 라벨! (배경 박스 삭제, 투명 태그 적용)
+      const getLabelHTML = (c: Customer) => {
+        const shortService = getShortServiceType(c.service_type || "");
+        const modelName = c.model_name || ""; // 💡 모델명 원상 복구 (안 자름)
+
+        let tags = "";
+        if (shortService || modelName) {
+          const sBadge = shortService
+            ? `<span class="map-label-tag service">${shortService}</span>`
+            : "";
+          const mBadge = modelName
+            ? `<span class="map-label-tag model">${modelName}</span>`
+            : "";
+          tags = `<div style="display:flex; gap:2px; margin-bottom:1px;">${sBadge}${mBadge}</div>`;
+        }
+
+        return `
+          <div style="display:flex; flex-direction:column; align-items:center; pointer-events:none;">
+            ${tags}
+            <span class="marker-label">${c.name}</span>
+          </div>
+        `;
       };
 
       const generateSingleHTML = (customer: Customer, groupId: string) => {
@@ -248,18 +272,17 @@ export default function KakaoMap({
               ? "contact"
               : "none";
 
-        // 💡 3. 주소 영역을 넓게 쓰고, 버튼들을 아래쪽으로 예쁘게 찢어놓은 단일 팝업!
         return `
-          <div class="custom-popup single-popup">
+          <div class="custom-popup single-popup" onwheel="event.stopPropagation()" ontouchmove="event.stopPropagation()" onmousedown="event.stopPropagation()">
             <button class="custom-popup-close" onclick="window.closeMapPopup('${groupId}')">✕</button>
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding-right:20px;">
               <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
               <span id="badge_${customer.id}" class="group-status-badge ${statusClass}">${customer.status || "미컨택"}</span>
             </div>
             ${getTagsHTML(customer)}
-            <div style="font-size:10px; color:#64748b; line-height:1.4; word-break:break-all; white-space:normal; flex:1; padding-right:8px;">
-  ${customer.address}
-</div>
+            <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:12px; word-break:break-all; white-space:normal;">
+              ${customer.address}
+            </div>
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
               <div style="display:flex; gap:4px;">
                 <a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화">📞</a>
@@ -291,7 +314,6 @@ export default function KakaoMap({
               ? "contact"
               : "none";
 
-        // 💡 3-1. 주소 영역을 넓게 쓰고, 버튼들을 아래쪽으로 예쁘게 찢어놓은 그룹 아코디언!
         return `
           <div class="group-item">
             <div class="group-item-header" onclick="window.toggleGroupItem(${customer.id})">
@@ -308,9 +330,9 @@ export default function KakaoMap({
             </div>
             
             <div id="group_body_${customer.id}" style="display:none; padding-top:4px; padding-bottom:12px;">
-              <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:12px; word-break:break-all; white-space:normal;">
-  ${customer.address}
-</div>
+              <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:10px; word-break:break-all; white-space:normal;">
+                ${customer.address}
+              </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <div style="display:flex; gap:4px;">
                   <a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화">📞</a>
@@ -360,8 +382,8 @@ export default function KakaoMap({
           });
           markerOverlay.setMap(mapRef.current);
 
-          // 💡 단일 마커에도 [서비스][모델명] 뜨게 적용 완료!
-          const labelContent = `<div class="marker-label">${getLabelText(customer)}</div>`;
+          const labelContent = getLabelHTML(customer);
+          // 💡 마커와 글자 사이 간격을 다시 원상복구! (-0.2)
           const labelOverlay = new window.kakao.maps.CustomOverlay({
             position: markerPosition,
             content: labelContent,
@@ -375,6 +397,7 @@ export default function KakaoMap({
             xAnchor: 0.5,
             yAnchor: 1.1,
             zIndex: 10,
+            clickable: true,
           });
 
           markerMapRef.current[groupId] = {
@@ -397,16 +420,18 @@ export default function KakaoMap({
             content: groupMarkerContent,
             yAnchor: 0.5,
             xAnchor: 0.5,
+            clickable: true,
           });
           markerOverlay.setMap(mapRef.current);
 
           const listHTML = group
             .map((c) => generateGroupItemHTML(c, groupId))
             .join("");
+
           const popupContent = `
-            <div class="custom-popup group-popup">
+            <div class="custom-popup group-popup" onwheel="event.stopPropagation()" ontouchmove="event.stopPropagation()" onmousedown="event.stopPropagation()">
               <div class="group-popup-header">
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;" title="${group[0].address}">
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;" title="${group[0].address}">
                   📍 ${extractBuildingName(group[0].address)} (${group.length}명)
                 </span>
                 <button onclick="window.closeMapPopup('${groupId}')">✕</button>
@@ -414,12 +439,14 @@ export default function KakaoMap({
               <div class="group-popup-list">${listHTML}</div>
             </div>
           `;
+
           const popupOverlay = new window.kakao.maps.CustomOverlay({
             content: popupContent,
             position: markerPosition,
             xAnchor: 0.5,
             yAnchor: 1.1,
             zIndex: 10,
+            clickable: true,
           });
 
           markerMapRef.current[groupId] = {
@@ -479,9 +506,15 @@ export default function KakaoMap({
           __html: `
         .group-marker { background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2.5px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s; }
         .group-marker:active { transform: scale(0.9); }
-        .marker-label { font-size: 12px; font-weight: 500; color: #21262e; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; white-space: nowrap; letter-spacing: -0.5px; }
+        
+        /* 💡 원래대로 복구된 라벨 스타일! */
+        .marker-label { font-size: 12px; font-weight: 700; color: #21262e; text-shadow: -1px -1px 0 rgba(255,255,255,0.8), 1px -1px 0 rgba(255,255,255,0.8), -1px 1px 0 rgba(255,255,255,0.8), 1px 1px 0 rgba(255,255,255,0.8); white-space: nowrap; letter-spacing: -0.5px; }
+        
+        /* 💡 투명한듯 세련된 반투명 지도 태그 스타일 */
+        .map-label-tag { font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 4px; letter-spacing: -0.5px; background: rgba(255,255,255,0.65); backdrop-filter: blur(2px); }
+        .map-label-tag.service { border: 1px solid rgba(37,99,235,0.4); color: #2563eb; }
+        .map-label-tag.model { border: 1px solid rgba(71,85,105,0.4); color: #475569; }
 
-        /* 💡 너비를 240px로 아주 살짝 늘렸어요! */
         .custom-popup { background: white; border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0; font-family: sans-serif; box-sizing: border-box; width: 240px; position: relative; bottom: 12px; }
         .custom-popup::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 6px 6px 0; border-style: solid; border-color: white transparent transparent transparent; }
         .single-popup { padding: 12px 14px; }
@@ -492,7 +525,7 @@ export default function KakaoMap({
         .group-popup-header { background: #f8fafc; padding: 10px 14px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; font-weight: 800; font-size: 12px; color: #1e293b; }
         .group-popup-header button { background: none; border: none; font-size: 13px; font-weight: bold; color: #94a3b8; cursor: pointer; }
         
-        .group-popup-list { padding: 0 14px; overflow-y: auto; display: flex; flex-direction: column; }
+        .group-popup-list { padding: 0 14px; overflow-y: auto; display: flex; flex-direction: column; flex: 1; overscroll-behavior: contain; }
         .group-popup-list::-webkit-scrollbar { width: 4px; }
         .group-popup-list::-webkit-scrollbar-track { background: transparent; }
         .group-popup-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -518,7 +551,7 @@ export default function KakaoMap({
         .tmap-btn { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
         .nmap-btn { background: #ecfdf5; border-color: #a7f3d0; color: #10b981; }
         
-        .map-status-selector { display: flex; gap: 2px; background: #f1f5f9; padding: 2px; border-radius: 6px; }
+        .map-status-selector { display: flex; gap: 2px; background: #f1f5f9; padding: 2px; border-radius: 6px; margin-top: 4px; }
         .map-status-selector input[type="radio"] { display: none; }
         .map-status-selector label { flex: 1; text-align: center; font-size: 10px; font-weight: 700; padding: 4px 0; border-radius: 4px; cursor: pointer; color: #94a3b8; transition: all 0.2s ease; }
         .map-status-selector input[value="미컨택"]:checked + label { background: #ef4444; color: #fff; box-shadow: 0 1px 3px rgba(239,68,68,0.3); }

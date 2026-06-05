@@ -159,10 +159,34 @@ export default function CustomerList({
           filteredCustomers.map((customer, index) => (
             <div
               key={customer.id}
-              className="flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition"
+              className="relative flex items-center justify-between p-3.5 pr-3 bg-white border border-slate-100 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition"
             >
+              {/* 💡 삭제(X) 버튼을 카드 오른쪽 상단으로 분리! */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(customer.id);
+                }}
+                className="absolute top-2 right-2 p-1 text-slate-300 hover:text-rose-500 transition"
+                title="삭제"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+
               <div
-                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer pt-1"
                 onClick={() =>
                   (window as any).focusCustomerMarker?.(customer.id)
                 }
@@ -170,7 +194,7 @@ export default function CustomerList({
                 <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold shrink-0">
                   {index + 1}
                 </div>
-                <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex flex-col gap-1 min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-sm text-slate-800 truncate">
                       {customer.name}
@@ -187,7 +211,6 @@ export default function CustomerList({
                     {customer.address}
                   </span>
 
-                  {/* 💡 전화번호 클릭 시 전화 걸기 연동 (tel:) */}
                   {customer.phone && (
                     <a
                       href={`tel:${customer.phone}`}
@@ -210,7 +233,8 @@ export default function CustomerList({
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                         </svg>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-600 border-b border-transparent hover:border-slate-400">
+                      {/* 💡 whitespace-nowrap 추가해서 전화번호 무조건 한 줄로! */}
+                      <span className="text-[11px] font-bold text-slate-600 border-b border-transparent hover:border-slate-400 whitespace-nowrap">
                         {formatPhoneNumber(customer.phone)}
                       </span>
                     </a>
@@ -218,13 +242,15 @@ export default function CustomerList({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 pl-2">
+              {/* 💡 삭제 버튼은 빼고 내비/티맵 버튼만 깔끔하게, 사이즈 약간 축소! */}
+              <div className="flex items-center gap-1.5 shrink-0 pt-3">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleNaviOpen("tmap", customer);
                   }}
-                  className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition shadow-sm text-xs font-black"
+                  className="w-7 h-7 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition shadow-sm text-[10px] font-black"
+                  title="티맵"
                 >
                   T
                 </button>
@@ -233,28 +259,10 @@ export default function CustomerList({
                     e.stopPropagation();
                     handleNaviOpen("nmap", customer);
                   }}
-                  className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition shadow-sm text-xs font-black"
+                  className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition shadow-sm text-[10px] font-black"
+                  title="네이버"
                 >
                   N
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(customer.id);
-                  }}
-                  className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition shadow-sm"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
                 </button>
               </div>
             </div>
