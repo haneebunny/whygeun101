@@ -1,0 +1,24 @@
+spring:
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+  datasource:
+    # 내 컴퓨터면 H2를 쓰고, Render(환경변수)면 그 주소를 쓰도록 자동 분기
+    url: ${DB_URL:jdbc:h2:mem:testdb}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+
+  jpa:
+    # 서버가 켜질 때마다 Entity 구조를 보고 DB 테이블을 자동 생성/수정함
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+jwt:
+  # 토큰 서명에 사용할 비밀키 (실무에서는 엄청 길고 복잡한 영문/숫자 조합 사용)
+  secret: super-secret-key-for-fieldwork-101-hanibe-application
+
+kakao:
+  # 카카오 디벨로퍼스에서 발급받은 REST API 키
+  client-id: 543622ef4fa082724af123eddd102943

@@ -11,7 +11,7 @@ import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
   const IS_DEV = process.env.NODE_ENV === "development";
-  const BACKEND_IP = IS_DEV ? "localhost:8000" : "sales-map-db.onrender.com";
+  const BACKEND_IP = IS_DEV ? "localhost:8080" : "sales-map-db.onrender.com";
 
   const [activeTab, setActiveTab] = useState<string>("home");
   const [successCustomers, setSuccessCustomers] = useState<Customer[]>([]);
