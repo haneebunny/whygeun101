@@ -15,7 +15,6 @@ export default function KakaoScript() {
   return (
     <Script
       src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.1/kakao.min.js"
-      integrity="sha384-8khm7vdaS5WDZ6RRCas4tGMy0jVv8DQLVThm9NqA2T6M1KvUoEX8Nee8P3Y/P7Y4"
       crossOrigin="anonymous"
       strategy="afterInteractive"
       onLoad={() => {
