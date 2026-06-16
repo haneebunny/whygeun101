@@ -54,7 +54,10 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
-        {/* 1. 서비스 워커 등록을 위한 인라인 스크립트 */}
+        {/* 1. 카카오 로그인 SDK */}
+        <KakaoScript />
+
+        {/* 2. 서비스 워커 등록 스크립트 */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -65,13 +68,11 @@ export default function RootLayout({
           }}
         />
 
-        {/* 2. 카카오맵 SDK 로드를 위한 Next.js Script 컴포넌트 */}
+        {/* 3. 카카오맵 지도 SDK */}
         <Script
           src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_JS_KEY}&autoload=false`}
           strategy="lazyOnload"
         />
-        {/* 카카오 로그인 */}
-        <KakaoScript />
       </head>
       <body>{children}</body>
     </html>
