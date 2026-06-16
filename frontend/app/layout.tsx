@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Script from "next/script";
+import KakaoScript from "@/components/KakaoScript";
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff7c",
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -64,6 +70,8 @@ export default function RootLayout({
           src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_JS_KEY}&autoload=false`}
           strategy="lazyOnload"
         />
+        {/* 카카오 로그인 */}
+        <KakaoScript />
       </head>
       <body>{children}</body>
     </html>

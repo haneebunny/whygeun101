@@ -7,7 +7,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  allowedDevOrigins: ["172.30.103.23"],
+  allowedDevOrigins: ["172.30.103.9", "localhost"],
 };
 
 export default nextConfig;

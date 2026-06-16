@@ -9,9 +9,9 @@ function CallbackContent() {
   const code = searchParams.get("code");
 
   const IS_DEV = process.env.NODE_ENV === "development";
-  // 💡 메인 페이지에서 쓰던 내 백엔드 아이피 그대로 사용!
+
   const BACKEND_IP = IS_DEV
-    ? "localhost:8080"
+    ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
     : "sales-map-api-java.onrender.com";
   const protocol = IS_DEV ? "http" : "https";
 
@@ -34,8 +34,10 @@ function CallbackContent() {
 
         if (response.ok) {
           const data = await response.json();
-          // 💡 발급받은 '출입증(토큰)'을 내 브라우저 금고(localStorage)에 보관!
-          localStorage.setItem("token", data.access_token);
+          // 발급받은 '출입증(토큰)'을 내 브라우저 금고(localStorage)에 보관!
+          const token = data.access_token || data.accessToken;
+
+          localStorage.setItem("token", token);
           localStorage.setItem("nickname", data.nickname);
 
           router.push("/"); // 메인 화면으로 돌아가기

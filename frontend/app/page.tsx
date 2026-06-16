@@ -12,7 +12,7 @@ import { Customer, FailedCustomer } from "@/types";
 export default function Home() {
   const IS_DEV = process.env.NODE_ENV === "development";
   const BACKEND_IP = IS_DEV
-    ? "localhost:8080"
+    ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
     : "sales-map-api-java.onrender.com";
 
   const [activeTab, setActiveTab] = useState<string>("home");
@@ -26,7 +26,7 @@ export default function Home() {
   const [nickname, setNickname] = useState<string>("");
   const [isFetching, setIsFetching] = useState(false);
 
-  // 💡 실패 목록 아코디언 열림/닫힘 상태
+  // 실패 목록 아코디언 열림/닫힘 상태
   const [isFailedListOpen, setIsFailedListOpen] = useState(false);
 
   useEffect(() => {
@@ -37,6 +37,32 @@ export default function Home() {
       if (storedNickname) setNickname(storedNickname);
     }
     setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const receiveNativeMessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "NATIVE_GPS_RESPONSE") {
+          const { latitude, longitude } = data.payload;
+          // 1. 내 지도의 중심 좌표 값을 이 위/경도로 세팅!
+          // 2. 혹은 필요시 영업팀 서버 사서 DB에 외근 현장 기록 백엔드로 갱신 요청 보내기!
+          console.log("기기로부터 전송받은 GPS:", latitude, longitude);
+        }
+      } catch (e) {
+        console.error("네이티브 메시지 처리 중 오류:", e);
+      }
+    };
+
+    // iOS 및 안드로이드 웹뷰 통신 수신용 이벤트 부착
+    window.addEventListener("message", receiveNativeMessage);
+    document.addEventListener("message", receiveNativeMessage);
+
+    return () => {
+      window.removeEventListener("message", receiveNativeMessage);
+      document.removeEventListener("message", receiveNativeMessage);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -60,10 +86,34 @@ export default function Home() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+
       if (response.ok) {
         const data = await response.json();
-        setSuccessCustomers(data.success_list || []);
+        const list = data.success_list || [];
+
+        const savedOrder = localStorage.getItem("routeOrder");
+        if (savedOrder) {
+          const orderIds = JSON.parse(savedOrder);
+          list.sort((a: Customer, b: Customer) => {
+            const idxA = orderIds.indexOf(a.id);
+            const idxB = orderIds.indexOf(b.id);
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+          });
+        }
+
+        setSuccessCustomers(list);
         setFailedCustomers(data.failed_list || []);
+      } else if (response.status === 401) {
+        // 서버가 초기화되었거나 토큰이 만료되어 401 에러가 반환된 경우 자동 로그아웃 처리
+        alert(
+          "로그인 정보가 만료되었거나 서버가 초기화되었습니다. 다시 로그인해주세요.",
+        );
+        localStorage.removeItem("token");
+        localStorage.removeItem("nickname");
+        localStorage.removeItem("routeOrder");
+        setIsLoggedIn(false);
       }
     } catch (error) {
       console.error(error);
