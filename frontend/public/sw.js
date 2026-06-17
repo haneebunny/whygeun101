@@ -1,4 +1,6 @@
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
-self.addEventListener("fetch", () => {});
+self.addEventListener("fetch", () => {
+  event.respondWith(fetch(event.request));
+});
