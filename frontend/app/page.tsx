@@ -81,13 +81,10 @@ export default function Home() {
     setIsFetching(true);
     try {
       const token = localStorage.getItem("token");
-      const protocol = IS_DEV ? "http" : "https";
-      const response = await fetch(
-        `${protocol}://${BACKEND_IP}/api/customers`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+
+      const response = await fetch(`${BACKEND_IP}/api/customers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -128,9 +125,8 @@ export default function Home() {
     if (!editText.trim()) return;
     try {
       const token = localStorage.getItem("token");
-      const protocol = IS_DEV ? "http" : "https";
       const response = await fetch(
-        `${protocol}://${BACKEND_IP}/api/customers/${customerId}`,
+        `${BACKEND_IP}/api/customers/${customerId}`,
         {
           method: "PUT",
           headers: {
@@ -158,14 +154,10 @@ export default function Home() {
     if (!confirm("삭제하시겠습니까?")) return;
     try {
       const token = localStorage.getItem("token");
-      const protocol = IS_DEV ? "http" : "https";
-      const response = await fetch(
-        `${protocol}://${BACKEND_IP}/api/customers/${id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const response = await fetch(`${BACKEND_IP}/api/customers/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (response.ok) fetchCustomers();
     } catch (error) {
       console.error(error);

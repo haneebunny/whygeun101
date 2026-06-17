@@ -11,10 +11,6 @@ export default function ExcelUploader({
 }) {
   const [loading, setLoading] = useState(false);
 
-  // 💡 로컬 환경(http)인지 클라우드 환경(https)인지 자동으로 판단!
-  const IS_DEV = process.env.NODE_ENV === "development";
-  const protocol = IS_DEV ? "http" : "https";
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const formData = new FormData();
@@ -23,14 +19,11 @@ export default function ExcelUploader({
 
     try {
       const token = localStorage.getItem("token"); // 👈 토큰 꺼내기
-      const response = await fetch(
-        `${protocol}://${backendIp}/api/customers/upload`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        },
-      );
+      const response = await fetch(`${backendIp}/api/customers/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
       if (!response.ok) throw new Error();
       alert("엑셀 명단 싱크가 완료되었습니다!");
       onUploadSuccess();
@@ -45,7 +38,7 @@ export default function ExcelUploader({
     if (!confirm("초기화하시겠습니까?")) return;
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${protocol}://${backendIp}/api/customers`, {
+      const response = await fetch(`${backendIp}/api/customers`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

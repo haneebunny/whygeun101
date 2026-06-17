@@ -153,11 +153,10 @@ export default function KakaoMap({
       }
 
       // 5. 백엔드 통신 (DB 저장)
-      const protocol =
-        process.env.NODE_ENV === "development" ? "http" : "https";
+
       try {
         const token = localStorage.getItem("token");
-        await fetch(`${protocol}://${backendIp}/api/customers/${id}/status`, {
+        await fetch(`${backendIp}/api/customers/${id}/status`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",

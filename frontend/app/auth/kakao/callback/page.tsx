@@ -22,17 +22,14 @@ function CallbackContent() {
 
     const loginWithKakao = async () => {
       try {
-        const response = await fetch(
-          `${protocol}://${BACKEND_IP}/api/auth/kakao`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code: code,
-              redirect_uri: window.location.origin + "/auth/kakao/callback",
-            }),
-          },
-        );
+        const response = await fetch(`${BACKEND_IP}/api/auth/kakao`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: code,
+            redirect_uri: window.location.origin + "/auth/kakao/callback",
+          }),
+        });
 
         if (response.ok) {
           const data = await response.json();
