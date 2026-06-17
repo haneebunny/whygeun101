@@ -8,12 +8,14 @@ function CallbackContent() {
   const searchParams = useSearchParams();
   const code = searchParams.get("code");
 
-  const IS_DEV = process.env.NODE_ENV === "development";
+  // const IS_DEV = process.env.NODE_ENV === "development";
 
-  const BACKEND_IP = IS_DEV
-    ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
-    : "sales-map-api-java.onrender.com";
-  const protocol = IS_DEV ? "http" : "https";
+  // const BACKEND_IP = IS_DEV
+  //   ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
+  //   : "sales-map-api-java.onrender.com";
+  // const protocol = IS_DEV ? "http" : "https";
+
+  const BACKEND_IP = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     if (!code) return;

@@ -10,10 +10,12 @@ import Login from "@/components/Login";
 import { Customer, FailedCustomer } from "@/types";
 
 export default function Home() {
-  const IS_DEV = process.env.NODE_ENV === "development";
-  const BACKEND_IP = IS_DEV
-    ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
-    : "sales-map-api-java.onrender.com";
+  // const IS_DEV = process.env.NODE_ENV === "development";
+  // const BACKEND_IP = IS_DEV
+  //   ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
+  //   : "sales-map-api-java.onrender.com";
+
+  const BACKEND_IP = process.env.NEXT_PUBLIC_API_URL;
 
   const [activeTab, setActiveTab] = useState<string>("home");
   const [successCustomers, setSuccessCustomers] = useState<Customer[]>([]);
