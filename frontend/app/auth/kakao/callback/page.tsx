@@ -51,7 +51,7 @@ function CallbackContent() {
     };
 
     loginWithKakao();
-  }, [code, router, protocol, BACKEND_IP]);
+  }, [code, router, BACKEND_IP]);
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] flex flex-col justify-center items-center">
