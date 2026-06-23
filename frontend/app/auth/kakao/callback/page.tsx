@@ -2,59 +2,45 @@
 
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { authRepository } from "@/src/data/repositories/authApi";
+import { useAlert } from "@/src/presentation/components/AlertContext";
 
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get("code");
-
-  // const IS_DEV = process.env.NODE_ENV === "development";
-
-  // const BACKEND_IP = IS_DEV
-  //   ? `${typeof window !== "undefined" ? window.location.hostname : "localhost"}:8080`
-  //   : "sales-map-api-java.onrender.com";
-  // const protocol = IS_DEV ? "http" : "https";
-
-  const BACKEND_IP = process.env.NEXT_PUBLIC_API_URL;
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     if (!code) return;
 
     const loginWithKakao = async () => {
       try {
-        const response = await fetch(`${BACKEND_IP}/api/auth/kakao`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: code,
-            redirect_uri: window.location.origin + "/auth/kakao/callback",
-          }),
+        const redirectUri = window.location.origin + "/auth/kakao/callback";
+        const result = await authRepository.loginWithKakao(code, redirectUri);
+
+        // Save token and nickname to browser local storage
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("nickname", result.nickname);
+
+        router.push("/"); // Back to home
+      } catch (error: any) {
+        console.error("Login error:", error);
+        showAlert({
+          title: "로그인 실패",
+          message: "카카오 로그인 연동에 실패했습니다. 다시 시도해 주세요.",
+          type: "error",
+          debugInfo: error.stack || error.toString()
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          // 발급받은 '출입증(토큰)'을 내 브라우저 금고(localStorage)에 보관!
-          const token = data.access_token || data.accessToken;
-
-          localStorage.setItem("token", token);
-          localStorage.setItem("nickname", data.nickname);
-
-          router.push("/"); // 메인 화면으로 돌아가기
-        } else {
-          alert("로그인에 실패했습니다.");
-          router.push("/");
-        }
-      } catch (error) {
-        console.error("로그인 에러:", error);
         router.push("/");
       }
     };
 
     loginWithKakao();
-  }, [code, router, BACKEND_IP]);
+  }, [code, router]);
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] flex flex-col justify-center items-center">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-center items-center">
       <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
       <p className="text-slate-600 font-bold">카카오 로그인 처리 중입니다...</p>
     </div>
@@ -65,7 +51,7 @@ export default function KakaoCallback() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#f5f7fa] flex justify-center items-center">
+        <div className="min-h-screen bg-[#f8fafc] flex justify-center items-center">
           로딩중...
         </div>
       }

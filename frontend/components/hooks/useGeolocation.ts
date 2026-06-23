@@ -1,3 +1,4 @@
+import { useAlert } from "@/src/presentation/components/AlertContext";
 import { useState, useRef, MutableRefObject } from "react";
 
 declare global {
@@ -13,10 +14,15 @@ export const useGeolocation = (mapRef: MutableRefObject<any>) => {
   const watchIdRef = useRef<number | null>(null);
   const myLocMarkerRef = useRef<any>(null);
   const hasPannedForTracking = useRef(false);
+  const { showAlert } = useAlert();
 
   const toggleLocationTracking = () => {
     if (!navigator.geolocation) {
-      alert("현재 기기에서 위치 추적을 지원하지 않습니다.");
+      showAlert({
+        title: "위치 추적 불가",
+        message: `현재 기기에서 위치 추적을 지원하지 않습니다.`,
+        type: "error",
+      });
       return;
     }
     if (window.ReactNativeWebView) {
@@ -27,7 +33,6 @@ export const useGeolocation = (mapRef: MutableRefObject<any>) => {
       );
     } else {
       // 만약 일반 PC 브라우저 접속이라면 가볍게 알림이나 브라우저 기본 geolocation 실행
-      alert("스마트폰 앱에서 실행하시면 GPS 추적이 매우 정교해집니다.");
     }
     if (isTracking) {
       navigator.geolocation.clearWatch(watchIdRef.current!);

@@ -34,24 +34,47 @@ public class CustomerService {
         String name; String address; String phone; String modelName; String serviceType;
     }
 
-    // 💡 1. 엑셀 업로드 (병렬처리)
-    public void uploadExcel(MultipartFile file, User user) throws Exception {
+    // 💡 1. 엑셀 업로드 및 동기화 (+N -N)
+    public Map<String, Integer> uploadExcel(MultipartFile file, User user) throws Exception {
         Workbook workbook = WorkbookFactory.create(file.getInputStream());
         Sheet sheet = workbook.getSheetAt(0);
         Row headerRow = sheet.getRow(0);
 
         int nameIdx = -1, addrIdx = -1, phoneIdx = -1, modelIdx = -1, serviceIdx = -1;
+        int phonePriority = 0; // 0: 없음, 1: 일반전화(전화번호), 2: 휴대폰/핸드폰(최우선)
+
         for (Cell cell : headerRow) {
-            String header = getCellValue(cell);
-            if (header.equals("실사용자명")) nameIdx = cell.getColumnIndex();
-            else if (header.equals("주소")) addrIdx = cell.getColumnIndex();
-            else if (header.equals("휴대폰번호") || header.equals("전화번호")) phoneIdx = cell.getColumnIndex();
-            else if (header.equals("모델명")) modelIdx = cell.getColumnIndex();
-            else if (header.equals("서비스 타입")) serviceIdx = cell.getColumnIndex();
+            String header = getCellValue(cell).trim().replace(" ", "").toLowerCase();
+            if (header.contains("실사용자") || header.contains("실고객") || header.contains("고객명") || 
+                header.contains("이름") || header.contains("성함") || header.contains("성명") || header.contains("사용자")) {
+                nameIdx = cell.getColumnIndex();
+            }
+            else if (header.contains("주소") || header.contains("소재지") || header.contains("위치")) {
+                addrIdx = cell.getColumnIndex();
+            }
+            else if (header.contains("휴대폰") || header.contains("핸드폰") || header.contains("연락처") || header.contains("폰번호")) {
+                // 최우선 휴대폰 열 매칭 (우선순위 2)
+                phoneIdx = cell.getColumnIndex();
+                phonePriority = 2;
+            }
+            else if (header.contains("전화")) {
+                // 휴대폰 열이 아직 매칭되지 않은 경우에만 일반전화 열 매칭 (우선순위 1)
+                if (phonePriority < 2) {
+                    phoneIdx = cell.getColumnIndex();
+                    phonePriority = 1;
+                }
+            }
+            else if (header.contains("모델") || header.contains("기기")) {
+                modelIdx = cell.getColumnIndex();
+            }
+            else if (header.contains("서비스") || header.contains("타입") || header.contains("구분")) {
+                serviceIdx = cell.getColumnIndex();
+            }
         }
 
+        // Fallback or validation
         if (nameIdx == -1 || addrIdx == -1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'실사용자명'과 '주소' 열이 필요합니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "'고객명(이름/성함)'과 '주소' 열이 존재해야 연동할 수 있습니다.");
         }
 
         List<ExcelRowData> rowDataList = new ArrayList<>();
@@ -64,8 +87,20 @@ public class CustomerService {
             if (name.isEmpty() || address.isEmpty()) continue;
 
             String phone = phoneIdx != -1 ? getCellValue(row.getCell(phoneIdx)) : "";
-            if (phone.endsWith(".0")) phone = phone.substring(0, phone.length() - 2);
-            if (!phone.isEmpty() && !phone.startsWith("0")) phone = "0" + phone;
+            // 1. Remove trailing float .0 if present
+            if (phone.endsWith(".0")) {
+                phone = phone.substring(0, phone.length() - 2);
+            }
+            // 2. Clean non-numeric characters (hyphens, spaces, letters)
+            phone = phone.replaceAll("[^0-9]", "").trim();
+            // 3. Prepend leading 0 if missing from numeric import (e.g. 1012345678 -> 01012345678)
+            if (!phone.isEmpty() && !phone.startsWith("0")) {
+                phone = "0" + phone;
+            }
+            // 4. Strip scientific notation artifact (e.g., 010123456789 from E9)
+            if (phone.length() == 12 && phone.startsWith("01") && phone.endsWith("9")) {
+                phone = phone.substring(0, phone.length() - 1);
+            }
 
             String modelName = modelIdx != -1 ? getCellValue(row.getCell(modelIdx)) : "";
             String serviceType = serviceIdx != -1 ? getCellValue(row.getCell(serviceIdx)) : "";
@@ -74,27 +109,39 @@ public class CustomerService {
         }
         workbook.close();
 
-        rowDataList.parallelStream().forEach(data -> {
-            if (customerRepository.existsByNameAndAddressAndUserId(data.getName(), data.getAddress(), user.getId())) {
-                return;
+        // 1. 기존 DB 고객 정보 조회
+        List<Customer> dbCustomers = customerRepository.findByUserId(user.getId());
+
+        int addedCount = 0;
+        for (ExcelRowData data : rowDataList) {
+            boolean foundInDb = false;
+            for (Customer dbc : dbCustomers) {
+                if (dbc.getName().equals(data.getName()) && dbc.getAddress().equals(data.getAddress())) {
+                    foundInDb = true;
+                    break;
+                }
             }
+            if (!foundInDb) {
+                String refinedAddress = data.getAddress().replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
+                double[] coords = getCoordinatesViaKakao(refinedAddress);
 
-            String refinedAddress = data.getAddress().replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
-            double[] coords = getCoordinatesViaKakao(refinedAddress);
+                Customer customer = Customer.builder()
+                        .name(data.getName())
+                        .address(data.getAddress())
+                        .latitude(coords[0] == 0.0 ? null : coords[0])
+                        .longitude(coords[1] == 0.0 ? null : coords[1])
+                        .phone(data.getPhone())
+                        .modelName(data.getModelName())
+                        .serviceType(data.getServiceType())
+                        .user(user)
+                        .build();
 
-            Customer customer = Customer.builder()
-                    .name(data.getName())
-                    .address(data.getAddress())
-                    .latitude(coords[0] == 0.0 ? null : coords[0])
-                    .longitude(coords[1] == 0.0 ? null : coords[1])
-                    .phone(data.getPhone())
-                    .modelName(data.getModelName())
-                    .serviceType(data.getServiceType())
-                    .user(user)
-                    .build();
+                customerRepository.save(customer);
+                addedCount++;
+            }
+        }
 
-            customerRepository.save(customer);
-        });
+        return Map.of("addedCount", addedCount, "deletedCount", 0);
     }
 
     private double[] getCoordinatesViaKakao(String address) {
@@ -115,11 +162,13 @@ public class CustomerService {
         return new double[]{0.0, 0.0};
     }
 
+    private final org.apache.poi.ss.usermodel.DataFormatter dataFormatter = new org.apache.poi.ss.usermodel.DataFormatter();
+
     private String getCellValue(Cell cell) {
         if (cell == null) return "";
         switch (cell.getCellType()) {
             case STRING: return cell.getStringCellValue().trim();
-            case NUMERIC: return String.valueOf(cell.getNumericCellValue()).trim();
+            case NUMERIC: return dataFormatter.formatCellValue(cell).trim();
             default: return "";
         }
     }
@@ -133,23 +182,29 @@ public class CustomerService {
 
         for (Customer c : allCustomers) {
             if (c.getLatitude() != null && c.getLongitude() != null) {
-                successList.add(Map.of(
-                        "id", c.getId(),
-                        "name", c.getName(),
-                        "address", c.getAddress(),
-                        "latitude", c.getLatitude(),
-                        "longitude", c.getLongitude(),
-                        "phone", c.getPhone() != null ? c.getPhone() : "",
-                        "status", c.getStatus() != null ? c.getStatus() : "미컨택",
-                        "model_name", c.getModelName() != null ? c.getModelName() : "",
-                        "service_type", c.getServiceType() != null ? c.getServiceType() : ""
+                successList.add(Map.ofEntries(
+                        Map.entry("id", c.getId()),
+                        Map.entry("name", c.getName()),
+                        Map.entry("address", c.getAddress()),
+                        Map.entry("latitude", c.getLatitude()),
+                        Map.entry("longitude", c.getLongitude()),
+                        Map.entry("phone", c.getPhone() != null ? c.getPhone() : ""),
+                        Map.entry("status", c.getStatus() != null ? c.getStatus() : "미컨택"),
+                        Map.entry("model_name", c.getModelName() != null ? c.getModelName() : ""),
+                        Map.entry("service_type", c.getServiceType() != null ? c.getServiceType() : ""),
+                        Map.entry("favorite", c.getFavorite() != null ? c.getFavorite() : false),
+                        Map.entry("visit_time", c.getVisitTime() != null ? c.getVisitTime() : ""),
+                        Map.entry("memo", c.getMemo() != null ? c.getMemo() : "")
                 ));
             } else {
                 failedList.add(Map.of(
                         "id", c.getId(),
                         "row", 0,
                         "name", c.getName(),
-                        "address", c.getAddress()
+                        "address", c.getAddress(),
+                        "favorite", c.getFavorite() != null ? c.getFavorite() : false,
+                        "visit_time", c.getVisitTime() != null ? c.getVisitTime() : "",
+                        "memo", c.getMemo() != null ? c.getMemo() : ""
                 ));
             }
         }
@@ -163,6 +218,26 @@ public class CustomerService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
 
         customer.setStatus(status);
+        customerRepository.save(customer);
+    }
+
+    // 💡 7. 고객 즐겨찾기 상태 토글
+    public void updateCustomerFavorite(Long customerId, boolean favorite, User user) {
+        Customer customer = customerRepository.findById(customerId)
+                .filter(c -> c.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
+
+        customer.setFavorite(favorite);
+        customerRepository.save(customer);
+    }
+
+    // 💡 8. 고객 방문 시간 업데이트
+    public void updateCustomerVisitTime(Long customerId, String visitTime, User user) {
+        Customer customer = customerRepository.findById(customerId)
+                .filter(c -> c.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
+
+        customer.setVisitTime(visitTime);
         customerRepository.save(customer);
     }
 
@@ -205,5 +280,104 @@ public class CustomerService {
     public void deleteAllCustomers(User user) {
         List<Customer> myCustomers = customerRepository.findByUserId(user.getId());
         customerRepository.deleteAll(myCustomers);
+    }
+
+    public void updateCustomerMemo(Long customerId, String memo, User user) {
+        Customer customer = customerRepository.findById(customerId)
+                .filter(c -> c.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
+        customer.setMemo(memo);
+        customerRepository.save(customer);
+    }
+
+    public Customer addCustomer(com.hanibe.fieldwork_101.dto.CustomerAddRequest request, User user) {
+        String refinedAddress = request.getAddress().replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
+        double[] coords = getCoordinatesViaKakao(refinedAddress);
+
+        Customer customer = Customer.builder()
+                .name(request.getName())
+                .address(request.getAddress())
+                .phone(request.getPhone())
+                .modelName(request.getModelName())
+                .serviceType(request.getServiceType())
+                .latitude(coords[0] == 0.0 ? null : coords[0])
+                .longitude(coords[1] == 0.0 ? null : coords[1])
+                .user(user)
+                .build();
+
+        return customerRepository.save(customer);
+    }
+
+    // 💡 7. 실시간 지역/날씨 조회 (Kakao Coord2RegionCode + Open-Meteo)
+    public Map<String, Object> getWeatherData(Double lat, Double lng) {
+        if (lat == null || lng == null) {
+            // Default to Seoul City Hall
+            lat = 37.5665;
+            lng = 126.9780;
+        }
+
+        String regionName = "서울시";
+        String kakaoUrl = "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=" + lng + "&y=" + lat;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "KakaoAK " + kakaoClientId);
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(kakaoUrl, HttpMethod.GET, entity, Map.class);
+            List<Map<String, Object>> docs = (List<Map<String, Object>>) response.getBody().get("documents");
+            if (docs != null && !docs.isEmpty()) {
+                Map<String, Object> doc = docs.get(0);
+                for (Map<String, Object> d : docs) {
+                    if ("H".equals(d.get("region_type"))) {
+                        doc = d;
+                        break;
+                    }
+                }
+                String depth2 = (String) doc.get("region_2depth_name");
+                String depth3 = (String) doc.get("region_3depth_name");
+                regionName = depth2 + " " + depth3;
+            }
+        } catch (Exception e) {
+            System.err.println("Kakao reverse geocoding failed: " + e.getMessage());
+        }
+
+        double temp = 20.0;
+        int weatherCode = 0;
+        String openMeteoUrl = String.format(
+            "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current=temperature_2m,weather_code&timezone=auto",
+            lat, lng
+        );
+
+        try {
+            ResponseEntity<Map> response = restTemplate.getForEntity(openMeteoUrl, Map.class);
+            Map<String, Object> current = (Map<String, Object>) response.getBody().get("current");
+            if (current != null) {
+                temp = Double.parseDouble(current.get("temperature_2m").toString());
+                weatherCode = Integer.parseInt(current.get("weather_code").toString());
+            }
+        } catch (Exception e) {
+            System.err.println("Open-Meteo weather fetch failed: " + e.getMessage());
+        }
+
+        String condition = getWeatherCondition(weatherCode);
+
+        return Map.of(
+            "temp", Math.round(temp),
+            "condition", condition,
+            "region", regionName,
+            "weatherCode", weatherCode
+        );
+    }
+
+    private String getWeatherCondition(int code) {
+        if (code == 0) return "맑음";
+        if (code >= 1 && code <= 3) return "구름조금";
+        if (code == 45 || code == 48) return "안개";
+        if (code >= 51 && code <= 55) return "이슬비";
+        if (code >= 61 && code <= 65) return "비";
+        if (code >= 71 && code <= 75) return "눈";
+        if (code >= 80 && code <= 82) return "소나기";
+        if (code >= 95 && code <= 99) return "뇌우";
+        return "흐림";
     }
 }

@@ -1,4 +1,4 @@
-import { Customer } from "@/types";
+import { Customer } from "../../src/domain/entities/types";
 
 export const extractBuildingName = (address: string) => {
   if (!address) return "같은 주소 고객";
@@ -85,6 +85,29 @@ export const getMajorityStatus = (group: Customer[]) => {
   return "완료";
 };
 
+export const formatVisitTime = (visitTimeStr: string | null | undefined): string => {
+  if (!visitTimeStr) return "지정 안 됨";
+  
+  // Format: "YYYY-MM-DD HH:mm"
+  const parts = visitTimeStr.split(" ");
+  const datePart = parts[0];
+  const timePart = parts[1] || "";
+  
+  const datePieces = datePart.split("-");
+  if (datePieces.length !== 3) return visitTimeStr;
+  
+  const year = datePieces[0];
+  const month = parseInt(datePieces[1], 10);
+  const date = parseInt(datePieces[2], 10);
+  
+  const dateObj = new Date(parseInt(year, 10), month - 1, date);
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const dayName = days[dateObj.getDay()];
+  
+  const formattedDate = `${year}년 ${month}월 ${date}일(${dayName})`;
+  return timePart ? `${formattedDate} ${timePart}` : formattedDate;
+};
+
 export const generateSingleHTML = (customer: Customer, groupId: string) => {
   const phoneLink = customer.phone ? customer.phone : "";
   const isNoneChecked = customer.status === "미컨택" ? "checked" : "";
@@ -96,21 +119,30 @@ export const generateSingleHTML = (customer: Customer, groupId: string) => {
       : customer.status === "컨택"
         ? "contact"
         : "none";
+  
+  const favoriteChar = customer.favorite ? "★" : "☆";
+  const visitTimeDisplay = customer.visit_time
+    ? `⏰ ${formatVisitTime(customer.visit_time)}`
+    : "⏰ 미지정";
 
   return `
     <div class="custom-popup single-popup" onwheel="event.stopPropagation()" ontouchmove="event.stopPropagation()" onmousedown="event.stopPropagation()">
       <button class="custom-popup-close" onclick="window.closeMapPopup('${groupId}')">✕</button>
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding-right:20px;">
-        <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
+        <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
+        <button onclick="window.reactToggleFavoriteFromMap(${customer.id}, ${!customer.favorite})" class="star-btn" style="border:none; background:none; cursor:pointer; color:#fbbf24; font-size:16px; padding:0; line-height:1;">${favoriteChar}</button>
         <span id="badge_${customer.id}" class="group-status-badge ${statusClass}">${customer.status || "미컨택"}</span>
       </div>
       ${getTagsHTML(customer)}
-      <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:12px; word-break:break-all; white-space:normal;">
+      <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:6px; word-break:break-all; white-space:normal;">
         ${customer.address}
+      </div>
+      <div onclick="window.reactEditTimeFromMap(${customer.id}, '${customer.visit_time || ""}')" style="font-size:11px; font-weight:700; color:#3b82f6; cursor:pointer; margin-bottom:12px; display:inline-block; hover:underline;">
+        ${visitTimeDisplay}
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <div style="display:flex; gap:4px;">
-          <a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화">📞</a>
+          ${phoneLink ? `<a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0;">📞</a>` : ""}
           <button onclick="window.handleNaviMap('tmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn tmap-btn" title="티맵">T</button>
           <button onclick="window.handleNaviMap('nmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn nmap-btn" title="네이버">N</button>
         </div>
@@ -139,14 +171,22 @@ export const generateGroupItemHTML = (customer: Customer, groupId: string) => {
         ? "contact"
         : "none";
 
+  const favoriteChar = customer.favorite ? "★" : "☆";
+  const visitTimeDisplay = customer.visit_time
+    ? `⏰ ${formatVisitTime(customer.visit_time)}`
+    : "⏰ 미지정";
+
   return `
     <div class="group-item">
-      <div class="group-item-header" onclick="window.toggleGroupItem(${customer.id})">
-        <div style="display:flex; flex-direction:column; gap:4px; max-width: 140px;">
-          <span class="group-item-name">${customer.name}</span>
+      <div class="group-item-header">
+        <div style="display:flex; flex-direction:column; gap:4px; max-width: 130px;" onclick="window.toggleGroupItem(${customer.id}); if(window.reactSelectCustomer) { window.reactSelectCustomer(${customer.id}); }">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span class="group-item-name">${customer.name}</span>
+            <button onclick="event.stopPropagation(); window.reactToggleFavoriteFromMap(${customer.id}, ${!customer.favorite})" class="star-btn" style="border:none; background:none; cursor:pointer; color:#fbbf24; font-size:14px; padding:0; line-height:1;">${favoriteChar}</button>
+          </div>
           ${getTagsHTML(customer)}
         </div>
-        <div class="group-item-icons">
+        <div class="group-item-icons" onclick="window.toggleGroupItem(${customer.id}); if(window.reactSelectCustomer) { window.reactSelectCustomer(${customer.id}); }">
           <span id="badge_${customer.id}" class="group-status-badge ${statusClass}">${customer.status || "미컨택"}</span>
           <svg id="group_arrow_${customer.id}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
             <polyline points="6 9 12 15 18 9"></polyline>
@@ -155,12 +195,15 @@ export const generateGroupItemHTML = (customer: Customer, groupId: string) => {
       </div>
       
       <div id="group_body_${customer.id}" style="display:none; padding-top:4px; padding-bottom:12px;">
-        <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:10px; word-break:break-all; white-space:normal;">
+        <div style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom:6px; word-break:break-all; white-space:normal;">
           ${customer.address}
         </div>
+        <div onclick="window.reactEditTimeFromMap(${customer.id}, '${customer.visit_time || ""}')" style="font-size:11px; font-weight:700; color:#3b82f6; cursor:pointer; margin-bottom:10px; display:inline-block; hover:underline;">
+          ${visitTimeDisplay}
+        </div>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-          <div style="display:flex; gap:4px;">
-            <a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화">📞</a>
+          <div style="display:flex; gap:4px; align-items:center;">
+            ${phoneLink ? `<a href="tel:${phoneLink}" class="circle-btn phone-btn" title="전화" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; text-decoration:none; display:flex; align-items:center; justify-content:center; width:28px; height:28px; borderRadius:50%;">📞</a>` : ""}
             <button onclick="window.handleNaviMap('tmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn tmap-btn" title="티맵">T</button>
             <button onclick="window.handleNaviMap('nmap', ${customer.longitude}, ${customer.latitude}, '${customer.name}')" class="circle-btn nmap-btn" title="네이버">N</button>
           </div>

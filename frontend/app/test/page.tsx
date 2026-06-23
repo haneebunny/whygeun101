@@ -24,8 +24,10 @@ export default function AppBridgeTest() {
           });
           setLog("✅ GPS 좌표 수신 성공!");
         }
-      } catch (err) {
-        setLog("데이터 파싱 에러");
+      } catch (error) {
+        setLog(
+          `데이터 파싱 에러:{error instanceof Error ? error.message : String(error)}`,
+        );
       }
     };
 

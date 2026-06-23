@@ -25,8 +25,16 @@ public class Customer {
     @Builder.Default
     private String status = "미컨택";
 
+    @Builder.Default
+    private Boolean favorite = false;
+
+    private String visitTime;
+
     private String modelName;
     private String serviceType;
+
+    @Column(columnDefinition = "TEXT")
+    private String memo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
