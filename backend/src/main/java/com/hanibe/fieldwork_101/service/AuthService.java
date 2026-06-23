@@ -46,7 +46,9 @@ public class AuthService {
             return userRepository.save(newUser);
         });
 
-        if (!nickname.equals("영업사원") && !nickname.equals(user.getNickname())) {
+        // Only overwrite if current nickname in DB is null, empty, or default "영업사원"
+        boolean isDefaultOrEmpty = user.getNickname() == null || user.getNickname().isEmpty() || user.getNickname().equals("영업사원");
+        if (isDefaultOrEmpty && !nickname.equals("영업사원") && !nickname.equals(user.getNickname())) {
             user = User.builder()
                     .id(user.getId())
                     .kakaoId(user.getKakaoId())

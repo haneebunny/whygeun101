@@ -23,8 +23,12 @@ public class CustomerController {
     public ResponseEntity<?> uploadExcel(@RequestParam("file") MultipartFile file,
                                          @LoginUser User user) {
         try {
-            customerService.uploadExcel(file, user);
-            return ResponseEntity.ok(Map.of("message", "업로드 및 동기화 처리가 완료되었습니다."));
+            Map<String, Integer> result = customerService.uploadExcel(file, user);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "addedCount", result.get("addedCount"),
+                "deletedCount", result.get("deletedCount")
+            ));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("detail", "서버 내부 오류: " + e.getMessage()));
         }
@@ -40,6 +44,24 @@ public class CustomerController {
                                           @RequestBody com.hanibe.fieldwork_101.dto.StatusUpdateRequest request,
                                           @LoginUser User user) {
         customerService.updateCustomerStatus(customerId, request.getStatus(), user);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PutMapping("/{customerId}/favorite")
+    public ResponseEntity<?> updateFavorite(@PathVariable Long customerId,
+                                            @RequestBody Map<String, Boolean> body,
+                                            @LoginUser User user) {
+        boolean favorite = body.getOrDefault("favorite", false);
+        customerService.updateCustomerFavorite(customerId, favorite, user);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PutMapping("/{customerId}/visit-time")
+    public ResponseEntity<?> updateVisitTime(@PathVariable Long customerId,
+                                             @RequestBody Map<String, String> body,
+                                             @LoginUser User user) {
+        String visitTime = body.get("visit_time");
+        customerService.updateCustomerVisitTime(customerId, visitTime, user);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -60,5 +82,28 @@ public class CustomerController {
     public ResponseEntity<?> clearAllCustomers(@LoginUser User user) {
         customerService.deleteAllCustomers(user);
         return ResponseEntity.ok(Map.of("message", "나의 모든 영업 동선 데이터가 초기화되었습니다."));
+    }
+
+    @PostMapping
+    public ResponseEntity<?> addCustomer(@RequestBody com.hanibe.fieldwork_101.dto.CustomerAddRequest request,
+                                         @LoginUser User user) {
+        com.hanibe.fieldwork_101.entity.Customer customer = customerService.addCustomer(request, user);
+        return ResponseEntity.ok(Map.of("success", true, "customer_id", customer.getId()));
+    }
+
+    @PutMapping("/{customerId}/memo")
+    public ResponseEntity<?> updateMemo(@PathVariable Long customerId,
+                                        @RequestBody Map<String, String> body,
+                                        @LoginUser User user) {
+        String memo = body.get("memo");
+        customerService.updateCustomerMemo(customerId, memo, user);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @GetMapping("/weather")
+    public ResponseEntity<?> getWeather(@RequestParam(value = "lat", required = false) Double lat,
+                                         @RequestParam(value = "lng", required = false) Double lng) {
+        Map<String, Object> data = customerService.getWeatherData(lat, lng);
+        return ResponseEntity.ok(data);
     }
 }

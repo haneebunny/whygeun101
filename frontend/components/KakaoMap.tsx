@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Customer } from "@/types";
+import { Customer } from "../src/domain/entities/types";
+import { customerRepository } from "../src/data/repositories/customerApi";
 import "./kakaoMap.css";
 import { useGeolocation } from "./hooks/useGeolocation";
 import {
@@ -17,6 +18,7 @@ interface KakaoMapProps {
   isFullScreen?: boolean;
   onExpand?: () => void;
   backendIp: string;
+  onVisibleCustomersChange?: (ids: number[]) => void;
 }
 
 export default function KakaoMap({
@@ -24,7 +26,9 @@ export default function KakaoMap({
   isFullScreen = false,
   onExpand,
   backendIp,
+  onVisibleCustomersChange,
 }: KakaoMapProps) {
+  const isFirstLoadRef = useRef(true);
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<any>(null);
@@ -37,6 +41,9 @@ export default function KakaoMap({
   const groupStatusesRef = useRef<{
     [groupId: string]: { [id: number]: string };
   }>({});
+
+  const overlaysRef = useRef<any[]>([]);
+  const openedPopupGroupIdRef = useRef<string | null>(null);
 
   const { isTracking, toggleLocationTracking, clearTracking } =
     useGeolocation(mapRef);
@@ -80,92 +87,20 @@ export default function KakaoMap({
       status: string,
       groupId: string,
     ) => {
-      const target = markerMapRef.current[groupId];
-
-      // 💡 1. 비밀장부 업데이트 및 우선순위 계산!
-      if (groupStatusesRef.current[groupId]) {
-        groupStatusesRef.current[groupId][id] = status;
-        const statuses = Object.values(groupStatusesRef.current[groupId]);
-
-        let uncontacted = 0,
-          contact = 0;
-        statuses.forEach((s) => {
-          if (s === "컨택") contact++;
-          else if (s !== "완료") uncontacted++;
-        });
-
-        // 기본값을 파란색(모두 완료)으로 세팅
-        let newColor = "#3b82f6";
-        let newImg = "/images/marker_completed.png";
-
-        // 1순위: 미컨택이 1명이라도 있으면 무조건 빨강!
-        if (uncontacted > 0) {
-          newColor = "#ef4444";
-          newImg = "/images/marker_uncontacted.png";
-        }
-        // 2순위: 컨택이 1명이라도 있으면 무조건 노랑!
-        else if (contact > 0) {
-          newColor = "#eab308";
-          newImg = "/images/marker_contacted.png";
-        }
-
-        // 💡 2. 진짜 카카오 핀(마커) 이미지 즉시 변경!
-        if (target && target.marker && target.marker.setImage) {
-          target.marker.setImage(
-            new window.kakao.maps.MarkerImage(
-              newImg,
-              new window.kakao.maps.Size(20, 20),
-            ),
-          );
-        }
-
-        // 💡 3. 말풍선 색깔 펜으로 직접 칠하기!
-        const bubble = document.getElementById(`group_bubble_${groupId}`);
-        const tail = document.getElementById(`group_tail_${groupId}`);
-        if (bubble) {
-          bubble.style.color = newColor;
-          bubble.style.borderColor = newColor;
-        }
-        if (tail) {
-          tail.style.borderBottomColor = newColor;
-          tail.style.borderRightColor = newColor;
-        }
-      } else {
-        // 단일 마커일 때
-        if (target && target.marker && target.marker.setImage) {
-          let newImg = "/images/marker_uncontacted.png";
-          if (status === "컨택") newImg = "/images/marker_contacted.png";
-          if (status === "완료") newImg = "/images/marker_completed.png";
-          target.marker.setImage(
-            new window.kakao.maps.MarkerImage(
-              newImg,
-              new window.kakao.maps.Size(20, 20),
-            ),
-          );
-        }
+      if ((window as any).reactUpdateStatusHook) {
+        (window as any).reactUpdateStatusHook(id, status);
       }
+    };
 
-      // 4. 리스트 내부 상태 뱃지 업데이트
-      const badge = document.getElementById(`badge_${id}`);
-      if (badge) {
-        badge.innerText = status;
-        badge.className = `group-status-badge ${status === "완료" ? "done" : status === "컨택" ? "contact" : "none"}`;
+    (window as any).reactToggleFavoriteFromMap = (id: number, favorite: boolean) => {
+      if ((window as any).reactToggleFavoriteHook) {
+        (window as any).reactToggleFavoriteHook(id, favorite);
       }
+    };
 
-      // 5. 백엔드 통신 (DB 저장)
-
-      try {
-        const token = localStorage.getItem("token");
-        await fetch(`${backendIp}/api/customers/${id}/status`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status }),
-        });
-      } catch (error) {
-        console.error("상태 업데이트 실패:", error);
+    (window as any).reactEditTimeFromMap = (id: number, currentVal: string) => {
+      if ((window as any).reactEditTimeHook) {
+        (window as any).reactEditTimeHook(id, currentVal);
       }
     };
 
@@ -174,6 +109,7 @@ export default function KakaoMap({
       Object.values(markerMapRef.current).forEach(({ popup }) =>
         popup.setMap(null),
       );
+      openedPopupGroupIdRef.current = groupId;
       const target = markerMapRef.current[groupId];
       if (target && target.popup) {
         target.popup.setMap(mapRef.current);
@@ -184,6 +120,9 @@ export default function KakaoMap({
     (window as any).closeMapPopup = (groupId: string) => {
       const target = markerMapRef.current[groupId];
       if (target && target.popup) target.popup.setMap(null);
+      if (openedPopupGroupIdRef.current === groupId) {
+        openedPopupGroupIdRef.current = null;
+      }
     };
 
     (window as any).toggleGroupItem = (id: number) => {
@@ -223,9 +162,15 @@ export default function KakaoMap({
     window.kakao.maps.load(() => {
       const validCustomers = customers.filter((c) => c.latitude && c.longitude);
 
+      // Clean up previous custom overlays and native markers
+      overlaysRef.current.forEach((o) => {
+        if (o && o.setMap) o.setMap(null);
+      });
+      overlaysRef.current = [];
+
       Object.values(markerMapRef.current).forEach(({ marker, popup }) => {
-        marker.setMap(null);
-        if (popup) popup.setMap(null);
+        if (marker && marker.setMap) marker.setMap(null);
+        if (popup && popup.setMap) popup.setMap(null);
       });
       markerMapRef.current = {};
       customerToGroupRef.current = {};
@@ -244,6 +189,35 @@ export default function KakaoMap({
           center: defaultCenter,
           level: isFullScreen ? 7 : 6,
         });
+
+        // Add idle event listener once when map is initialized
+        if (onVisibleCustomersChange) {
+          const reportVisible = () => {
+            if (!mapRef.current) return;
+            const mapBounds = mapRef.current.getBounds();
+            const sw = mapBounds.getSouthWest();
+            const ne = mapBounds.getNorthEast();
+
+            const visibleIds = validCustomers
+              .filter((c) => {
+                const lat = c.latitude!;
+                const lng = c.longitude!;
+                return (
+                  lat >= sw.getLat() &&
+                  lat <= ne.getLat() &&
+                  lng >= sw.getLng() &&
+                  lng <= ne.getLng()
+                );
+              })
+              .map((c) => c.id);
+
+            onVisibleCustomersChange(visibleIds);
+          };
+
+          window.kakao.maps.event.addListener(mapRef.current, "idle", reportVisible);
+          // Initial trigger
+          setTimeout(reportVisible, 500);
+        }
       }
 
       const bounds = new window.kakao.maps.LatLngBounds();
@@ -287,6 +261,7 @@ export default function KakaoMap({
             image: markerImage,
           });
           markerOverlay.setMap(mapRef.current);
+          overlaysRef.current.push(markerOverlay);
 
           const labelOverlay = new window.kakao.maps.CustomOverlay({
             position: markerPosition,
@@ -294,6 +269,7 @@ export default function KakaoMap({
             yAnchor: -0.2,
           });
           labelOverlay.setMap(mapRef.current);
+          overlaysRef.current.push(labelOverlay);
 
           const popupOverlay = new window.kakao.maps.CustomOverlay({
             content: generateSingleHTML(customer, groupId),
@@ -309,9 +285,12 @@ export default function KakaoMap({
             popup: popupOverlay,
             type: "single",
           };
-          window.kakao.maps.event.addListener(markerOverlay, "click", () =>
-            (window as any).openMapPopup(groupId),
-          );
+          window.kakao.maps.event.addListener(markerOverlay, "click", () => {
+            (window as any).openMapPopup(groupId);
+            if ((window as any).reactSelectCustomer) {
+              (window as any).reactSelectCustomer(customer.id);
+            }
+          });
         } else {
           const majorityStatus = getMajorityStatus(group);
           let bubbleColor = "#ef4444";
@@ -334,6 +313,7 @@ export default function KakaoMap({
             image: markerImage,
           });
           markerOverlay.setMap(mapRef.current);
+          overlaysRef.current.push(markerOverlay);
 
           // 💡 2. 그 머리 위에 말풍선(숫자)을 띄우기 (translateY(-20px)로 위로 밀어올림)
           const bubbleStyle = `color: ${bubbleColor}; border-color: ${bubbleColor};`;
@@ -355,6 +335,7 @@ export default function KakaoMap({
             clickable: true,
           });
           bubbleOverlay.setMap(mapRef.current);
+          overlaysRef.current.push(bubbleOverlay);
 
           const listHTML = group
             .map((c) => generateGroupItemHTML(c, groupId))
@@ -380,9 +361,12 @@ export default function KakaoMap({
           });
 
           // 💡 마커(핀)를 클릭해도 팝업이 열리도록 설정!
-          window.kakao.maps.event.addListener(markerOverlay, "click", () =>
-            (window as any).openMapPopup(groupId),
-          );
+          window.kakao.maps.event.addListener(markerOverlay, "click", () => {
+            (window as any).openMapPopup(groupId);
+            if ((window as any).reactSelectCustomer && group.length > 0) {
+              (window as any).reactSelectCustomer(group[0].id);
+            }
+          });
 
           markerMapRef.current[groupId] = {
             marker: markerOverlay,
@@ -392,8 +376,18 @@ export default function KakaoMap({
         }
       });
 
-      if (validCustomers.length > 0 && mapRef.current)
+      // Restore previously open popup
+      if (openedPopupGroupIdRef.current) {
+        const target = markerMapRef.current[openedPopupGroupIdRef.current];
+        if (target && target.popup) {
+          target.popup.setMap(mapRef.current);
+        }
+      }
+
+      if (validCustomers.length > 0 && mapRef.current && isFirstLoadRef.current) {
         mapRef.current.setBounds(bounds);
+        isFirstLoadRef.current = false;
+      }
     });
   }, [mapLoaded, customers, isFullScreen]);
 

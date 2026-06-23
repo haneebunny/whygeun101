@@ -46,6 +46,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { AlertProvider } from "@/src/presentation/components/AlertContext";
+
 export default function RootLayout({
   children,
 }: {
@@ -74,7 +76,11 @@ export default function RootLayout({
           strategy="lazyOnload"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AlertProvider>
+          {children}
+        </AlertProvider>
+      </body>
     </html>
   );
 }

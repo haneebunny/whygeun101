@@ -9,25 +9,11 @@ export default function Login() {
       : "https://sales-map-db.vercel.app/auth/kakao/callback";
 
   const handleKakaoLogin = () => {
-    if (typeof window !== "undefined" && (window as any).Kakao) {
-      const kakaoSDK = (window as any).Kakao;
-
-      if (!kakaoSDK.isInitialized()) {
-        kakaoSDK.init(process.env.NEXT_PUBLIC_KAKAO_JS_KEY);
-      }
-
-      console.log("카카오 SDK를 이용한 간편 로그인 전환 시도");
-
-      kakaoSDK.Auth.authorize({
-        redirectUri: REDIRECT_URI,
-      });
-    } else {
-      if (!KAKAO_CLIENT_ID) {
-        alert("환경변수(카카오 API 키)가 설정되지 않았습니다.");
-        return;
-      }
-      window.location.href = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code`;
+    if (!KAKAO_CLIENT_ID) {
+      alert("환경변수(NEXT_PUBLIC_KAKAO_REST_API_KEY)가 설정되지 않았습니다.");
+      return;
     }
+    window.location.href = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code`;
   };
 
   return (
