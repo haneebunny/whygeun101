@@ -1,26 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #1f2937;
+  --font-sans: 'Noto Sans KR', sans-serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-primary: #4f8ef7;
+  --color-secondary: #5bae85;
+  --color-status-none: #e87b72;
+  --color-status-contact: #f2b84b;
+  --color-status-done: #5b9cf6;
+  --color-status-failed: #9aa3af;
+  --font-sans: 'Noto Sans KR', sans-serif;
+  
+  /* Global Font Weight Adjustments */
+  --font-weight-black: 700;
+  --font-weight-extrabold: 700;
+  --font-weight-bold: 600;
+  --font-weight-semibold: 400;
+  --font-weight-medium: 400;
+  --font-weight-normal: 400;
+  --font-weight-light: 300;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Global Slate Color Softening */
+  --color-slate-900: #334155;
+  --color-slate-850: #334155;
+  --color-slate-800: #475569;
+  --color-slate-700: #475569;
+  --color-slate-650: #64748b;
+  --color-slate-600: #64748b;
+  --color-slate-500: #64748b;
+  --color-slate-450: #828fa3;
+  --color-slate-400: #828fa3;
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: #475569;
+  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+/* Glassmorphism custom utilities for Tailwind v4 compilation */
+
+@utility app-pastel-bg {
+  background: linear-gradient(135deg, #E3E8FA 0%, #F0E5F5 50%, #FDF5EC 100%) !important;
+}
+
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(79, 142, 247, 0.18);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  border-radius: 20px;
+  transition: all 0.2s ease-in-out;
+}
+
+@utility glass-card-interactive {
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(79, 142, 247, 0.28);
+    box-shadow: 0 10px 36px 0 rgba(31, 38, 135, 0.08);
+    transform: translateY(-1px);
+  }
+}
+
+@utility glass-header {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1.5px solid rgba(79, 142, 247, 0.15);
+}
+
+@utility glass-nav-floating {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 12px 32px 0 rgba(31, 38, 135, 0.06);
+  border-radius: 24px;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Custom animation for list items */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Explicit typographic and color overrides to force browser-level styles */
+
+.font-black, .font-extrabold {
+  font-weight: 700 !important;
+}
+
+.font-bold {
+  font-weight: 600 !important;
+}
+
+.font-semibold, .font-medium {
+  font-weight: 400 !important;
+}
+
+.text-slate-900, .text-slate-850, .text-slate-800, .text-slate-700 {
+  color: #334155 !important;
+}
+
+.text-slate-650, .text-slate-600, .text-slate-500, .text-slate-450, .text-slate-400 {
+  color: #64748b !important;
+}
+
+.text-primary {
+  color: #4f8ef7 !important;
 }

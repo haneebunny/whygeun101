@@ -13,26 +13,26 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://sales-map-db.vercel.app"),
-  title: "외근의 정석",
+  metadataBase: new URL("https://whygeun101.com"),
+  title: "모두의 외근",
   description: "위치 기반 동선 관리로 매일 더 스마트한 외근을 시작하세요.",
   authors: [{ name: "현서친구 하니" }],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "외근의 정석",
+    title: "모두의 외근",
   },
   openGraph: {
-    title: "외근의 정석 | 스마트한 영업 동선 관리",
+    title: "모두의 외근 | 스마트한 영업 동선 관리",
     description: "매일 더 스마트한 외근을 시작하세요! (만든이 : 현서친구 하니)",
-    siteName: "외근의 정석",
+    siteName: "모두의 외근",
     images: [
       {
         url: "/images/meta_img.png",
         width: 1200,
         height: 630,
-        alt: "외근의 정석 썸네일",
+        alt: "모두의 외근 썸네일",
       },
     ],
     locale: "ko_KR",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "외근의 정석 | 스마트한 영업 동선 관리",
+    title: "모두의 외근 | 스마트한 영업 동선 관리",
     description: "매일 더 스마트한 외근을 시작하세요! (만든이 : 현서친구 하니)",
     images: ["/images/meta_img.png"],
   },

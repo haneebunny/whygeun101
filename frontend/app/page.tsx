@@ -500,14 +500,14 @@ function PageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col max-w-md mx-auto relative shadow-2xl overflow-x-hidden border-x border-slate-100/60">
+    <div className="min-h-screen app-pastel-bg flex flex-col max-w-md mx-auto relative shadow-2xl overflow-x-hidden border-x border-slate-100/60">
       <Header
         isLoggedIn={isLoggedIn}
         nickname={nickname}
         onLoginClick={() => setShowLoginView(true)}
       />
 
-      <main className="flex-1 w-full bg-slate-50/50">
+      <main className="flex-1 w-full bg-transparent">
         {activeTab === "home" && (
           <HomeTab
             customers={successCustomers}

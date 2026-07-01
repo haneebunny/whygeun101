@@ -103,26 +103,30 @@ export default function MapTab({
   };
 
   const getStatusBadgeStyle = (status: string | undefined) => {
-    if (status === "컨택") {
-      return "bg-amber-50 text-amber-600 border border-amber-200/50";
+    const displayLabel = getDisplayLabel(status);
+    if (displayLabel === "완료") {
+      return "bg-[#5B9CF6]/10 text-[#5B9CF6] border border-[#5B9CF6]/20 font-extrabold";
     }
-    if (status === "완료") {
-      return "bg-blue-50 text-blue-600 border border-blue-200/50";
+    if (displayLabel === "진행중" || displayLabel === "상담중" || status === "컨택") {
+      return "bg-[#F2B84B]/10 text-[#F2B84B] border border-[#F2B84B]/20 font-extrabold";
     }
-    return "bg-rose-50 text-rose-600 border border-rose-200/50";
+    if (status === "주소 오류" || status === "취소") {
+      return "bg-[#9AA3AF]/10 text-[#9AA3AF] border border-[#9AA3AF]/20 font-extrabold";
+    }
+    return "bg-[#E87B72]/10 text-[#E87B72] border border-[#E87B72]/20 font-extrabold";
   };
 
   return (
-    <div className="w-full h-[calc(100vh-140px)] relative flex flex-col bg-slate-50">
+    <div className="w-full h-[calc(100vh-140px)] relative flex flex-col bg-transparent">
       {/* Search and Filters Header */}
-      <div className="w-full bg-white p-4 flex flex-col gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.02)] z-10">
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/70 rounded-xl px-3 py-2.5">
+      <div className="w-full glass-header p-4 flex flex-col gap-3 z-10 shadow-sm">
+        <div className="flex items-center gap-2 bg-white/40 border border-white/20 backdrop-blur-md rounded-xl px-3 py-2.5 shadow-inner">
           <svg
             width="18"
             height="18"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#94a3b8"
+            stroke="#6b7280"
             strokeWidth="2.2"
           >
             <circle cx="11" cy="11" r="8"></circle>
@@ -145,17 +149,17 @@ export default function MapTab({
             let defaultStyle = "";
 
             if (status === "미컨택") {
-              activeStyle = "bg-rose-50 text-rose-600 border border-rose-200 font-bold";
-              defaultStyle = "bg-white text-slate-500 border border-slate-100 hover:bg-rose-50/20";
+              activeStyle = "bg-[#E87B72]/20 text-[#E87B72] border border-[#E87B72]/30 font-extrabold";
+              defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#E87B72]/10";
             } else if (status === "컨택") {
-              activeStyle = "bg-amber-50 text-amber-600 border border-amber-200 font-bold";
-              defaultStyle = "bg-white text-slate-500 border border-slate-100 hover:bg-amber-50/20";
+              activeStyle = "bg-[#F2B84B]/20 text-[#F2B84B] border border-[#F2B84B]/30 font-extrabold";
+              defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#F2B84B]/10";
             } else if (status === "완료") {
-              activeStyle = "bg-blue-50 text-blue-600 border border-blue-200 font-bold";
-              defaultStyle = "bg-white text-slate-500 border border-slate-100 hover:bg-blue-50/20";
+              activeStyle = "bg-[#5B9CF6]/20 text-[#5B9CF6] border border-[#5B9CF6]/30 font-extrabold";
+              defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#5B9CF6]/10";
             } else {
-              activeStyle = "bg-slate-100 text-slate-700 border border-slate-200 font-bold";
-              defaultStyle = "bg-white text-slate-500 border border-slate-100 hover:bg-slate-50";
+              activeStyle = "bg-[#4F8EF7]/20 text-[#4F8EF7] border border-[#4F8EF7]/30 font-extrabold";
+              defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#4F8EF7]/10";
             }
 
             return (
@@ -183,23 +187,23 @@ export default function MapTab({
         />
 
         {/* 지도 / 리스트 플로팅 토글 */}
-        <div className="absolute top-4 right-4 z-10 flex bg-white/90 backdrop-blur-md rounded-xl shadow-md border border-slate-200/50 p-0.5">
+        <div className="absolute top-4 right-4 z-10 flex bg-white/45 backdrop-blur-md rounded-xl shadow-sm border border-white/25 p-0.5 animate-slide-up">
           <button
             onClick={() => setShowViewportList(false)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-extrabold transition-all cursor-pointer ${
               !showViewportList
-                ? "bg-blue-600 text-white"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-[#4F8EF7] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-800"
             }`}
           >
             🗺️ 지도
           </button>
           <button
             onClick={() => setShowViewportList(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-extrabold transition-all cursor-pointer ${
               showViewportList
-                ? "bg-blue-600 text-white"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-[#4F8EF7] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-800"
             }`}
           >
             📋 리스트
@@ -208,14 +212,14 @@ export default function MapTab({
 
         {/* Viewport Bound Customers Overlay Panel */}
         {showViewportList && (
-          <div className="absolute top-0 right-0 w-80 h-full bg-white/95 backdrop-blur-md border-l border-slate-200/80 shadow-2xl z-20 flex flex-col transition-all animate-slideLeft">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h4 className="text-[13.5px] font-extrabold text-slate-800 flex items-center gap-1.5">
+          <div className="absolute top-0 right-0 w-80 h-full bg-white/45 backdrop-blur-xl border-l border-white/20 shadow-2xl z-20 flex flex-col transition-all animate-slideLeft">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/20">
+              <h4 className="text-[13.5px] font-black text-slate-800 flex items-center gap-1.5">
                 <span>📍</span> 현재 화면 내 고객 ({viewportCustomers.length}명)
               </h4>
               <button
                 onClick={() => setShowViewportList(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full bg-slate-100"
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full bg-white/50 border border-slate-200/10 cursor-pointer"
               >
                 ✕
               </button>
@@ -226,40 +230,40 @@ export default function MapTab({
                 viewportCustomers.map((customer) => (
                   <div
                     key={customer.id}
-                    className="p-3 bg-white border border-slate-100 rounded-xl shadow-sm flex flex-col gap-2 hover:border-blue-200 transition"
+                    className="p-3.5 glass-card glass-card-interactive flex flex-col gap-2 transition"
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-1.5">
-                        <strong className="text-[13px] text-slate-800 font-bold">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <strong className="text-[13.5px] text-slate-900 font-black truncate">
                           {customer.name}
                         </strong>
                         <button
                           onClick={() => onToggleStar(customer.id, !customer.favorite)}
-                          className="text-amber-400 text-sm"
+                          className="text-amber-400 text-sm hover:scale-110 active:scale-95 transition cursor-pointer"
                         >
                           {customer.favorite ? "★" : "☆"}
                         </button>
                       </div>
-                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md ${getStatusBadgeStyle(customer.status)}`}>
+                      <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${getStatusBadgeStyle(customer.status)}`}>
                         {getDisplayLabel(customer.status)}
                       </span>
                     </div>
                     
-                    <p className="text-[11px] text-slate-500 line-clamp-2">
+                    <p className="text-[11.5px] text-slate-500 line-clamp-2 leading-relaxed">
                       {customer.address}
                     </p>
 
                     {customer.visit_time && (
-                      <div className="text-[10.5px] text-slate-600 font-semibold flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-md w-fit">
+                      <div className="text-[10.5px] text-primary font-bold flex items-center gap-1 bg-primary/10 border border-primary/15 px-2.5 py-1 rounded-lg w-fit mt-1">
                         ⏰ {formatVisitTime(customer.visit_time)} 방문
                       </div>
                     )}
 
-                    <div className="flex justify-end gap-1.5 border-t border-slate-50 pt-2 mt-1">
+                    <div className="flex justify-end gap-2 border-t border-slate-100/10 pt-2.5 mt-1.5">
                       {customer.phone && (
                         <a
                           href={`tel:${customer.phone}`}
-                          className="w-7 h-7 bg-slate-50 hover:bg-slate-100 border border-slate-200/50 rounded-lg flex items-center justify-center text-slate-500 text-xs transition"
+                          className="w-8 h-8 bg-white/60 hover:bg-primary/10 border border-slate-200/10 shadow-sm rounded-xl flex items-center justify-center text-slate-600 hover:text-primary text-[12.5px] transition"
                           title="전화"
                         >
                           📞
@@ -267,14 +271,14 @@ export default function MapTab({
                       )}
                       <button
                         onClick={() => handleNaviOpen("tmap", customer)}
-                        className="w-7 h-7 bg-slate-50 hover:bg-amber-50/20 border border-slate-200/50 rounded-lg flex items-center justify-center text-amber-500 font-extrabold text-[10px] transition"
+                        className="w-8 h-8 bg-white/60 hover:bg-amber-500/10 border border-slate-200/10 shadow-sm rounded-xl flex items-center justify-center text-amber-500 font-black text-[11px] transition cursor-pointer"
                         title="TMap"
                       >
                         T
                       </button>
                       <button
                         onClick={() => handleNaviOpen("nmap", customer)}
-                        className="w-7 h-7 bg-slate-50 hover:bg-emerald-50/20 border border-slate-200/50 rounded-lg flex items-center justify-center text-emerald-500 font-extrabold text-[10px] transition"
+                        className="w-8 h-8 bg-white/60 hover:bg-emerald-500/10 border border-slate-200/10 shadow-sm rounded-xl flex items-center justify-center text-emerald-500 font-black text-[11px] transition cursor-pointer"
                         title="NMap"
                       >
                         N
@@ -283,7 +287,7 @@ export default function MapTab({
                   </div>
                 ))
               ) : (
-                <div className="py-20 text-center text-[12px] text-slate-400">
+                <div className="py-20 text-center text-[12.5px] font-bold text-slate-500">
                   현재 지도 영역 안에 <br /> 해당하는 고객이 없습니다.
                 </div>
               )}

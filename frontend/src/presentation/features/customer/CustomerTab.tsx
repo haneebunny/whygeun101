@@ -294,15 +294,15 @@ export default function CustomerTab({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-5 pb-24 min-h-[calc(100vh-140px)] relative">
+    <div className="flex flex-col gap-4 p-5 pb-24 min-h-[calc(100vh-140px)] relative bg-transparent animate-slide-up">
       {/* Search Input */}
-      <div className="flex items-center gap-2 bg-white border border-slate-100 shadow-sm rounded-2xl px-4 py-3">
+      <div className="flex items-center gap-2 bg-white/40 border border-white/20 shadow-inner rounded-2xl px-4 py-3 backdrop-blur-md">
         <svg
           width="18"
           height="18"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#94a3b8"
+          stroke="#6b7280"
           strokeWidth="2.2"
         >
           <circle cx="11" cy="11" r="8"></circle>
@@ -315,7 +315,7 @@ export default function CustomerTab({
           onChange={(e) => setSearchTerm(e.target.value)}
           className="flex-1 bg-transparent border-0 outline-none text-[13.5px] text-slate-800 placeholder-slate-400 font-medium"
         />
-        <button className="text-slate-400 hover:text-blue-500 transition">
+        <button className="text-slate-500 hover:text-primary transition cursor-pointer">
           <svg
             width="18"
             height="18"
@@ -339,13 +339,13 @@ export default function CustomerTab({
 
       {/* Address Errors Section */}
       {failedCustomers.length > 0 && (
-        <div className="flex flex-col gap-3 p-4.5 bg-rose-50/50 border border-rose-100 rounded-2xl shadow-sm">
+        <div className="flex flex-col gap-3 p-4.5 bg-rose-500/10 border border-rose-500/20 backdrop-blur-md rounded-2xl shadow-sm animate-slide-up">
           <button
             onClick={() => setIsFailedListOpen(!isFailedListOpen)}
-            className="flex justify-between items-center w-full text-left"
+            className="flex justify-between items-center w-full text-left cursor-pointer"
           >
-            <div className="font-extrabold text-[13.5px] text-rose-600 flex items-center gap-1.5">
-              <span className="w-5 h-5 flex items-center justify-center bg-rose-100 rounded-full text-xs">
+            <div className="font-extrabold text-[13.5px] text-[#E87B72] flex items-center gap-1.5">
+              <span className="w-5 h-5 flex items-center justify-center bg-rose-500/20 rounded-full text-xs">
                 ⚠️
               </span>
               주소 오류 목록 ({failedCustomers.length}건)
@@ -357,25 +357,25 @@ export default function CustomerTab({
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
-              className={`text-rose-400 transition-transform ${isFailedListOpen ? "rotate-180" : ""}`}
+              className={`text-[#E87B72] transition-transform ${isFailedListOpen ? "rotate-180" : ""}`}
             >
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
 
           {isFailedListOpen && (
-            <ul className="flex flex-col gap-3 max-h-60 overflow-y-auto mt-2 pt-3 border-t border-rose-100/50">
+            <ul className="flex flex-col gap-3 max-h-60 overflow-y-auto mt-2 pt-3 border-t border-rose-500/10">
               {failedCustomers.map((item) => (
                 <li
                   key={item.id}
-                  className="text-xs pb-3 flex flex-col gap-2 border-b border-rose-100/30 last:border-0"
+                  className="text-xs pb-3 flex flex-col gap-2 border-b border-rose-500/10 last:border-0"
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex flex-col gap-0.5">
-                      <strong className="text-slate-800 text-[13px] font-bold">
+                      <strong className="text-slate-800 text-[13px] font-black">
                         {item.name}
                       </strong>
-                      <span className="text-slate-500 text-[11.5px]">
+                      <span className="text-slate-600 text-[11.5px] font-medium">
                         {item.address}
                       </span>
                     </div>
@@ -385,13 +385,13 @@ export default function CustomerTab({
                           setEditFailedId(item.id);
                           setEditFailedText(item.address);
                         }}
-                        className="text-slate-500 hover:text-blue-600 px-2 py-1 bg-white rounded-lg border border-slate-200 text-[11px] font-bold"
+                        className="text-slate-600 hover:text-primary px-2.5 py-1 bg-white/60 hover:bg-white/80 rounded-lg border border-slate-200/10 text-[11px] font-extrabold transition cursor-pointer"
                       >
                         수정
                       </button>
                       <button
                         onClick={() => onDeleteCustomer(item.id)}
-                        className="text-rose-500 hover:text-rose-700 px-2 py-1 bg-rose-50/50 rounded-lg border border-rose-100 text-[11px] font-bold"
+                        className="text-rose-500 hover:text-rose-700 px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 rounded-lg border border-rose-500/10 text-[11px] font-extrabold transition cursor-pointer"
                       >
                         삭제
                       </button>
@@ -401,19 +401,19 @@ export default function CustomerTab({
                     <div className="flex gap-1.5 mt-1">
                       <input
                         type="text"
-                        className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:border-blue-400 bg-white text-[12px]"
+                        className="flex-1 px-3 py-1.5 rounded-xl border border-white/20 text-slate-800 focus:outline-none focus:border-rose-400 bg-white/50 backdrop-blur-sm text-[12px] shadow-inner font-medium"
                         value={editFailedText}
                         onChange={(e) => setEditFailedText(e.target.value)}
                       />
                       <button
                         onClick={() => handleFailedAddressSubmit(item.id)}
-                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-[11.5px]"
+                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold rounded-xl text-[11.5px] cursor-pointer transition shadow-sm"
                       >
                         확인
                       </button>
                       <button
                         onClick={() => setEditFailedId(null)}
-                        className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-xl text-[11.5px]"
+                        className="px-3 py-1.5 bg-slate-300/60 hover:bg-slate-300/80 text-slate-700 rounded-xl text-[11.5px] cursor-pointer transition"
                       >
                         취소
                       </button>
@@ -440,34 +440,34 @@ export default function CustomerTab({
 
             if (status === statusLabels.none) {
               activeStyle =
-                "bg-rose-50 text-rose-600 border border-rose-200 font-bold";
+                "bg-[#E87B72]/20 text-[#E87B72] border border-[#E87B72]/30 font-extrabold";
               defaultStyle =
-                "bg-white text-slate-500 border border-slate-100 hover:bg-rose-50/20";
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#E87B72]/10";
             } else if (status === "컨택") {
               activeStyle =
-                "bg-amber-50 text-amber-600 border border-amber-200 font-bold";
+                "bg-[#F2B84B]/20 text-[#F2B84B] border border-[#F2B84B]/30 font-extrabold";
               defaultStyle =
-                "bg-white text-slate-500 border border-slate-100 hover:bg-amber-50/20";
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#F2B84B]/10";
             } else if (status === "완료") {
               activeStyle =
-                "bg-blue-50 text-blue-600 border border-blue-200 font-bold";
+                "bg-[#5B9CF6]/20 text-[#5B9CF6] border border-[#5B9CF6]/30 font-extrabold";
               defaultStyle =
-                "bg-white text-slate-500 border border-slate-100 hover:bg-blue-50/20";
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#5B9CF6]/10";
             } else if (status === "일정 있음") {
               activeStyle =
-                "bg-indigo-50 text-indigo-600 border border-indigo-200 font-bold";
+                "bg-indigo-500/20 text-indigo-600 border border-indigo-500/30 font-extrabold";
               defaultStyle =
-                "bg-white text-slate-500 border border-slate-100 hover:bg-indigo-50/20";
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-indigo-500/10";
             } else if (status === "⭐") {
               activeStyle =
-                "bg-amber-50 text-amber-600 border border-amber-200 font-bold";
+                "bg-[#F2B84B]/20 text-amber-500 border border-[#F2B84B]/30 font-extrabold";
               defaultStyle =
-                "bg-white text-slate-500 border border-slate-100 hover:bg-amber-50/20";
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-amber-500/10";
             } else {
               activeStyle =
-                "bg-slate-100 text-slate-700 border border-slate-200 font-bold";
+                "bg-[#4F8EF7]/20 text-primary border border-[#4F8EF7]/30 font-extrabold";
               defaultStyle =
-                "bg-white text-slate-500 border border-slate-100 hover:bg-slate-50";
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#4F8EF7]/10";
             }
 
             return (
@@ -487,7 +487,7 @@ export default function CustomerTab({
 
       {/* Sorting dropdown & Refresh */}
       <div className="flex justify-between items-center text-[12px] px-1">
-        <div className="flex items-center gap-1 bg-white border border-slate-200/60 rounded-xl px-2.5 py-1.5 text-slate-600 font-semibold shadow-sm">
+        <div className="flex items-center gap-1 bg-white/40 border border-white/20 backdrop-blur-md rounded-xl px-2.5 py-1.5 text-slate-600 font-semibold shadow-sm">
           <span>정렬</span>
           <select
             value={sortBy}
@@ -504,7 +504,7 @@ export default function CustomerTab({
         <div className="flex items-center gap-3">
           <button
             onClick={onClearAll}
-            className="flex items-center gap-1 text-rose-500 hover:text-rose-700 transition font-bold px-2 py-1"
+            className="flex items-center gap-1 text-rose-500 hover:text-rose-700 transition font-black px-2 py-1 cursor-pointer"
           >
             🗑️ 전체 초기화
           </button>
@@ -512,7 +512,7 @@ export default function CustomerTab({
           <button
             onClick={onRefresh}
             disabled={isFetching}
-            className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition font-bold px-2 py-1"
+            className="flex items-center gap-1 text-slate-500 hover:text-primary transition font-black px-2 py-1 cursor-pointer"
           >
             <svg
               width="14"
@@ -533,27 +533,24 @@ export default function CustomerTab({
       <div className="flex flex-col gap-3">
         {visibleCustomers.length > 0 ? (
           visibleCustomers.map((customer) => {
-            let statusBg = "bg-rose-500";
-            let badgeStyle = "bg-rose-50 text-rose-600 border-rose-200/40";
+            let selectBadgeStyle = "bg-[#E87B72]/10 text-[#E87B72] border-[#E87B72]/25";
 
             if (customer.status === "컨택") {
-              statusBg = "bg-amber-500";
-              badgeStyle = "bg-amber-50 text-amber-600 border-amber-200/40";
+              selectBadgeStyle = "bg-[#F2B84B]/10 text-[#F2B84B] border-[#F2B84B]/25";
             } else if (customer.status === "완료") {
-              statusBg = "bg-blue-500";
-              badgeStyle = "bg-blue-50 text-blue-600 border-blue-200/40";
+              selectBadgeStyle = "bg-[#5B9CF6]/10 text-[#5B9CF6] border-[#5B9CF6]/25";
             }
 
             return (
               <div
                 key={customer.id}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 hover:shadow-md/5 transition relative overflow-hidden"
+                className="glass-card glass-card-interactive p-4 flex flex-col gap-3 relative overflow-hidden"
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-start gap-1.5 min-w-0">
                     <div className="flex flex-col gap-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <strong className="text-[14px] text-slate-800 font-extrabold">
+                        <strong className="text-[14.5px] text-slate-900 font-black">
                           {customer.name} 고객
                         </strong>
                         <button
@@ -561,7 +558,7 @@ export default function CustomerTab({
                             onToggleStar(customer.id, !customer.favorite);
                             handleRecentActivity(customer.id);
                           }}
-                          className="text-amber-400 font-bold active:scale-90 transition text-md focus:outline-none"
+                          className="text-amber-400 font-bold active:scale-90 transition text-md focus:outline-none cursor-pointer"
                         >
                           {customer.favorite ? "★" : "☆"}
                         </button>
@@ -571,35 +568,37 @@ export default function CustomerTab({
                         <a
                           href={`tel:${customer.phone}`}
                           onClick={() => handleRecentActivity(customer.id)}
-                          className="text-[12.5px] text-slate-500 hover:text-slate-700 font-bold hover:underline w-fit"
+                          className="text-[12.5px] text-slate-500 hover:text-slate-750 font-extrabold hover:underline w-fit"
                         >
                           ☎︎ {formatPhoneNumber(customer.phone)}
                         </a>
                       )}
 
-                      <span className="text-[12px] text-slate-500 leading-relaxed font-normal mt-0.5">
+                      <span className="text-[12px] text-slate-650 leading-relaxed font-medium mt-0.5">
                         {customer.address}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1 items-end shrink-0">
+                  <div className="flex flex-col gap-2 items-end shrink-0">
                     {/* Status Badge Dropdown Switcher */}
-                    <select
-                      value={customer.status || "미컨택"}
-                      onChange={(e) => {
-                        onUpdateStatus(customer.id, e.target.value);
-                        handleRecentActivity(customer.id);
-                      }}
-                      className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border outline-none cursor-pointer appearance-none text-center bg-white ${badgeStyle}`}
-                    >
-                      <option value="미컨택">{statusLabels.none}</option>
-                      <option value="컨택">{statusLabels.contact}</option>
-                      <option value="완료">{statusLabels.done}</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={customer.status || "미컨택"}
+                        onChange={(e) => {
+                          onUpdateStatus(customer.id, e.target.value);
+                          handleRecentActivity(customer.id);
+                        }}
+                        className={`text-[10.5px] font-extrabold px-2.5 py-1 rounded-lg border outline-none cursor-pointer appearance-none text-center bg-white/60 hover:bg-white/80 transition ${selectBadgeStyle}`}
+                      >
+                        <option value="미컨택">{statusLabels.none}</option>
+                        <option value="컨택">{statusLabels.contact}</option>
+                        <option value="완료">{statusLabels.done}</option>
+                      </select>
+                    </div>
                     <button
                       onClick={() => onDeleteCustomer(customer.id)}
-                      className="text-[10px] font-bold text-slate-300 hover:text-rose-500 transition px-1.5 py-1"
+                      className="text-[10px] font-bold text-slate-400 hover:text-rose-500 transition px-1.5 py-0.5 cursor-pointer"
                     >
                       삭제
                     </button>
@@ -613,12 +612,12 @@ export default function CustomerTab({
                       setActiveMemoId(customer.id);
                       setMemoTempText(customer.memo || "");
                     }}
-                    className="bg-slate-50/50 hover:bg-slate-100/50 p-2.5 rounded-xl border border-slate-200/30 text-[12px] text-slate-600 cursor-pointer flex flex-col gap-1"
+                    className="bg-white/20 hover:bg-white/30 p-2.5 rounded-xl border border-white/10 text-[12px] text-slate-600 cursor-pointer flex flex-col gap-1 transition"
                   >
                     <span className="font-bold text-slate-400 text-[10.5px] flex items-center gap-1">
                       📝 메모
                     </span>
-                    <p className="line-clamp-2 italic text-slate-700 font-medium whitespace-pre-line">
+                    <p className="line-clamp-2 italic text-slate-700 font-medium whitespace-pre-line leading-relaxed">
                       {customer.memo}
                     </p>
                   </div>
@@ -626,18 +625,18 @@ export default function CustomerTab({
 
                 {/* Scheduling Area - only visible when exists */}
                 {customer.visit_time && customer.visit_time.trim() !== "" && (
-                  <div className="flex items-center justify-between bg-slate-50/30 p-2.5 rounded-xl border border-slate-100/50 text-[11.5px] text-slate-500">
-                    <span className="font-semibold flex items-center gap-1">
+                  <div className="flex items-center justify-between bg-white/20 p-2.5 rounded-xl border border-white/10 text-[11.5px] text-slate-600">
+                    <span className="font-bold flex items-center gap-1">
                       ⏰ 방문일정
                     </span>
                     <div className="flex items-center gap-1.5">
-                      <span>{formatVisitTime(customer.visit_time)} 방문</span>
+                      <span className="font-medium">{formatVisitTime(customer.visit_time)} 방문</span>
                       <button
                         onClick={() => {
                           setTempTime(customer.visit_time || null);
                           setActiveDateTimePickerId(customer.id);
                         }}
-                        className="text-blue-600 font-extrabold hover:underline cursor-pointer"
+                        className="text-primary font-black hover:underline cursor-pointer"
                       >
                         변경
                       </button>
@@ -646,13 +645,13 @@ export default function CustomerTab({
                 )}
 
                 {/* Card Actions (Memo, Calendar, TMap, Naver Map) */}
-                <div className="flex justify-end items-center gap-2 border-t border-slate-50 pt-2.5">
+                <div className="flex justify-end items-center gap-2 border-t border-slate-100/10 pt-2.5">
                   <button
                     onClick={() => {
                       setActiveMemoId(customer.id);
                       setMemoTempText(customer.memo || "");
                     }}
-                    className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/30 flex items-center justify-center transition"
+                    className="w-9 h-9 rounded-xl bg-white/50 hover:bg-white/85 border border-white/10 shadow-sm flex items-center justify-center transition cursor-pointer"
                     title="메모 작성/수정"
                   >
                     <svg
@@ -664,7 +663,7 @@ export default function CustomerTab({
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-slate-500"
+                      className="text-slate-600"
                     >
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                       <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -676,7 +675,7 @@ export default function CustomerTab({
                       setTempTime(customer.visit_time || null);
                       setActiveDateTimePickerId(customer.id);
                     }}
-                    className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/30 flex items-center justify-center transition"
+                    className="w-9 h-9 rounded-xl bg-white/50 hover:bg-white/85 border border-white/10 shadow-sm flex items-center justify-center transition cursor-pointer"
                     title="방문 일정 설정"
                   >
                     <svg
@@ -688,7 +687,7 @@ export default function CustomerTab({
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-slate-500"
+                      className="text-slate-600"
                     >
                       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                       <line x1="16" y1="2" x2="16" y2="6" />
@@ -702,7 +701,7 @@ export default function CustomerTab({
                       handleNaviOpen("tmap", customer);
                       handleRecentActivity(customer.id);
                     }}
-                    className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-blue-50/20 border border-slate-200/30 flex items-center justify-center text-blue-600 font-extrabold text-[12.5px] transition"
+                    className="w-9 h-9 rounded-xl bg-white/50 hover:bg-amber-500/10 border border-white/10 shadow-sm flex items-center justify-center text-amber-500 font-extrabold text-[12.5px] transition cursor-pointer"
                     title="티맵 네비"
                   >
                     T
@@ -713,7 +712,7 @@ export default function CustomerTab({
                       handleNaviOpen("nmap", customer);
                       handleRecentActivity(customer.id);
                     }}
-                    className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-emerald-50/20 border border-slate-200/30 flex items-center justify-center text-emerald-600 font-extrabold text-[12.5px] transition"
+                    className="w-9 h-9 rounded-xl bg-white/50 hover:bg-emerald-500/10 border border-white/10 shadow-sm flex items-center justify-center text-emerald-500 font-extrabold text-[12.5px] transition cursor-pointer"
                     title="네이버 네비"
                   >
                     N
@@ -723,7 +722,7 @@ export default function CustomerTab({
             );
           })
         ) : (
-          <div className="py-16 text-center text-[13px] text-slate-400 bg-white border border-slate-100 rounded-2xl shadow-sm">
+          <div className="py-16 text-center text-[13px] text-slate-500 glass-card">
             등록된 고객 목록이 없습니다. <br />
             오른쪽 아래 + 버튼을 눌러 추가해주세요!
           </div>
@@ -734,7 +733,7 @@ export default function CustomerTab({
       {visibleCount < sortedCustomers.length && (
         <div
           id="scroll-sentinel"
-          className="py-4 flex items-center justify-center text-[12.5px] text-slate-400 font-semibold gap-1.5 animate-pulse"
+          className="py-4 flex items-center justify-center text-[12.5px] text-slate-500 font-semibold gap-1.5 animate-pulse"
         >
           <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
           고객 불러오는 중...

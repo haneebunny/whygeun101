@@ -15,7 +15,7 @@ interface StatusContextType {
 }
 
 const defaultMapping: StatusMapping = {
-  none: "미연락",
+  none: "미컨택",
   contact: "컨택",
   done: "완료",
 };

@@ -1,6 +1,6 @@
 {
-  "name": "외근의 정석",
-  "short_name": "외근의정석",
+  "name": "모두의 외근",
+  "short_name": "모두의외근",
   "description": "위치 기반 스마트 영업 동선 관리",
   "start_url": "/",
   "display": "standalone",

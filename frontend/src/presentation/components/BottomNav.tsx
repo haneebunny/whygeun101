@@ -91,23 +91,23 @@ export default function BottomNav({ activeTab, setActiveTab }: BottomNavProps) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100/80 flex justify-around items-center px-4 py-3 pb-7 shadow-[0_-8px_30px_rgba(0,0,0,0.03)] z-50">
+    <nav className="fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[calc(448px-32px)] glass-nav-floating flex justify-around items-center px-3 py-2 z-50">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex flex-col items-center gap-1.5 w-16 transition-all ${
+            className={`flex flex-col items-center gap-1 w-16 transition-all ${
               isActive
-                ? "text-blue-600 scale-105 font-bold"
+                ? "text-primary scale-105 font-extrabold"
                 : "text-slate-400 hover:text-slate-600 font-semibold"
             }`}
           >
-            <div className={`p-1 rounded-xl transition-all ${isActive ? "bg-blue-50 text-blue-600" : ""}`}>
+            <div className={`p-1.5 rounded-2xl transition-all ${isActive ? "bg-primary/15 text-primary shadow-sm" : ""}`}>
               {tab.icon}
             </div>
-            <span className="text-[11px]">{tab.label}</span>
+            <span className="text-[10.5px] tracking-tight">{tab.label}</span>
           </button>
         );
       })}

@@ -28,7 +28,7 @@ export default function Login() {
             </svg>
           </div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            외근의 정석
+            모두의 외근
           </h1>
           <p className="text-sm text-slate-500 font-medium leading-relaxed">
             위치 기반 동선 관리로

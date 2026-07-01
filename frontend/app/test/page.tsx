@@ -76,7 +76,7 @@ export default function AppBridgeTest() {
       }}
     >
       <h1 style={{ fontSize: "20px", fontWeight: "bold" }}>
-        💼 외근의 정석 브릿지 테스트 연동 관제탑
+        💼 모두의 외근 브릿지 테스트 연동 관제탑
       </h1>
 
       <div
