@@ -1,4 +1,4 @@
-import { Customer, FailedCustomer } from "../entities/types";
+import { Customer, FailedCustomer, AddressCorrection } from "../entities/types";
 
 export interface CustomerRepository {
   getCustomers(): Promise<{ success_list: Customer[]; failed_list: FailedCustomer[] }>;
@@ -11,4 +11,6 @@ export interface CustomerRepository {
   updateVisitTime(customerId: number, visitTime: string | null): Promise<boolean>;
   addCustomer(name: string, address: string, phone: string, modelName: string, serviceType: string): Promise<boolean>;
   updateMemo(customerId: number, memo: string): Promise<boolean>;
+  getAddressCorrections(): Promise<AddressCorrection[]>;
+  applyCorrectionsBulk(): Promise<{ updated_count: number } | null>;
 }

@@ -39,6 +39,15 @@ function PageContent() {
       setIsLoggedIn(true);
       if (storedNickname) setNickname(storedNickname);
     }
+
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get("tab");
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+    }
+
     setIsLoading(false);
   }, []);
 
