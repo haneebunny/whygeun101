@@ -31,3 +31,7 @@ jwt:
 kakao:
   # 카카오 디벨로퍼스에서 발급받은 REST API 키
   client-id: ${KAKAO_REST_API_KEY:543622ef4fa082724af123eddd102943}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${LLM_MODEL:gpt-5.4-mini}

@@ -1,5 +1,5 @@
 import { CustomerRepository } from "../../domain/repositories/customerRepository";
-import { Customer, FailedCustomer } from "../../domain/entities/types";
+import { Customer, FailedCustomer, AddressCorrection } from "../../domain/entities/types";
 import { httpClient } from "../api/httpClient";
 
 export class CustomerApi implements CustomerRepository {
@@ -139,6 +139,20 @@ export class CustomerApi implements CustomerRepository {
       },
     );
     return response.ok;
+  }
+
+  async getAddressCorrections(): Promise<AddressCorrection[]> {
+    const response = await httpClient.request("/api/customers/corrections");
+    if (!response.ok) return [];
+    return await response.json();
+  }
+
+  async applyCorrectionsBulk(): Promise<{ updated_count: number } | null> {
+    const response = await httpClient.request("/api/customers/apply-corrections-bulk", {
+      method: "POST",
+    });
+    if (!response.ok) return null;
+    return await response.json();
   }
 }
 

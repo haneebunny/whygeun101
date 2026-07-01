@@ -36,3 +36,9 @@ backend/*.jar
 backend/*.war
 backend/*.zip
 backend/*.tar.gz
+
+# Environments (API Keys & Secrets)
+.env
+.env.local
+.env.*
+*.env
