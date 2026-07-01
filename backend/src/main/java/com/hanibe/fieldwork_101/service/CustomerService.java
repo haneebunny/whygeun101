@@ -125,10 +125,23 @@ public class CustomerService {
         int addedCount = 0;
         for (ExcelRowData data : rowDataList) {
             boolean foundInDb = false;
+            String cleanExcelPhone = data.getPhone().replaceAll("[^0-9]", "").trim();
+
             for (Customer dbc : dbCustomers) {
-                if (dbc.getName().equals(data.getName()) && dbc.getAddress().equals(data.getAddress())) {
-                    foundInDb = true;
-                    break;
+                String cleanDbPhone = dbc.getPhone() != null ? dbc.getPhone().replaceAll("[^0-9]", "").trim() : "";
+
+                if (!cleanExcelPhone.isEmpty() && !cleanDbPhone.isEmpty()) {
+                    // 1. 이름과 전화번호가 둘 다 있고 일치할 때 중복으로 간주
+                    if (dbc.getName().equals(data.getName()) && cleanDbPhone.equals(cleanExcelPhone)) {
+                        foundInDb = true;
+                        break;
+                    }
+                } else {
+                    // 2. 전화번호가 없는 경우, 이름과 주소가 일치할 때 중복으로 간주
+                    if (dbc.getName().equals(data.getName()) && dbc.getAddress().equals(data.getAddress())) {
+                        foundInDb = true;
+                        break;
+                    }
                 }
             }
             if (!foundInDb) {
