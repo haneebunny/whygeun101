@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Customer, FailedCustomer } from "../../../domain/entities/types";
 // @ts-ignore
 import * as Hangul from "hangul-js";
@@ -38,6 +39,7 @@ export default function CustomerTab({
   onUploadExcel,
   isFetching,
 }: CustomerTabProps) {
+  const router = useRouter();
   const { getDisplayLabel, statusLabels } = useStatus();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -339,90 +341,27 @@ export default function CustomerTab({
 
       {/* Address Errors Section */}
       {failedCustomers.length > 0 && (
-        <div className="flex flex-col gap-3 p-4.5 bg-rose-500/10 border border-rose-500/20 backdrop-blur-md rounded-2xl shadow-sm animate-slide-up">
-          <button
-            onClick={() => setIsFailedListOpen(!isFailedListOpen)}
-            className="flex justify-between items-center w-full text-left cursor-pointer"
+        <div
+          onClick={() => router.push("/address")}
+          className="flex justify-between items-center p-4 bg-rose-500/10 border border-rose-500/20 backdrop-blur-md rounded-2xl shadow-sm hover:bg-rose-500/15 active:scale-[0.99] transition-all cursor-pointer animate-slide-up"
+        >
+          <div className="font-extrabold text-[13.5px] text-[#E87B72] flex items-center gap-1.5">
+            <span className="w-5 h-5 flex items-center justify-center bg-rose-500/20 rounded-full text-xs">
+              ⚠️
+            </span>
+            주소 오류 목록 ({failedCustomers.length}건)이 있습니다. 보정하러 가기
+          </div>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            className="text-[#E87B72] shrink-0"
           >
-            <div className="font-extrabold text-[13.5px] text-[#E87B72] flex items-center gap-1.5">
-              <span className="w-5 h-5 flex items-center justify-center bg-rose-500/20 rounded-full text-xs">
-                ⚠️
-              </span>
-              주소 오류 목록 ({failedCustomers.length}건)
-            </div>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className={`text-[#E87B72] transition-transform ${isFailedListOpen ? "rotate-180" : ""}`}
-            >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-
-          {isFailedListOpen && (
-            <ul className="flex flex-col gap-3 max-h-60 overflow-y-auto mt-2 pt-3 border-t border-rose-500/10">
-              {failedCustomers.map((item) => (
-                <li
-                  key={item.id}
-                  className="text-xs pb-3 flex flex-col gap-2 border-b border-rose-500/10 last:border-0"
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <strong className="text-slate-800 text-[13px] font-black">
-                        {item.name}
-                      </strong>
-                      <span className="text-slate-600 text-[11.5px] font-medium">
-                        {item.address}
-                      </span>
-                    </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <button
-                        onClick={() => {
-                          setEditFailedId(item.id);
-                          setEditFailedText(item.address);
-                        }}
-                        className="text-slate-600 hover:text-primary px-2.5 py-1 bg-white/60 hover:bg-white/80 rounded-lg border border-slate-200/10 text-[11px] font-extrabold transition cursor-pointer"
-                      >
-                        수정
-                      </button>
-                      <button
-                        onClick={() => onDeleteCustomer(item.id)}
-                        className="text-rose-500 hover:text-rose-700 px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 rounded-lg border border-rose-500/10 text-[11px] font-extrabold transition cursor-pointer"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                  {editFailedId === item.id && (
-                    <div className="flex gap-1.5 mt-1">
-                      <input
-                        type="text"
-                        className="flex-1 px-3 py-1.5 rounded-xl border border-white/20 text-slate-800 focus:outline-none focus:border-rose-400 bg-white/50 backdrop-blur-sm text-[12px] shadow-inner font-medium"
-                        value={editFailedText}
-                        onChange={(e) => setEditFailedText(e.target.value)}
-                      />
-                      <button
-                        onClick={() => handleFailedAddressSubmit(item.id)}
-                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold rounded-xl text-[11.5px] cursor-pointer transition shadow-sm"
-                      >
-                        확인
-                      </button>
-                      <button
-                        onClick={() => setEditFailedId(null)}
-                        className="px-3 py-1.5 bg-slate-300/60 hover:bg-slate-300/80 text-slate-700 rounded-xl text-[11.5px] cursor-pointer transition"
-                      >
-                        취소
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
         </div>
       )}
 

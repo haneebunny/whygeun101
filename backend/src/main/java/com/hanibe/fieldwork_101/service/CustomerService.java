@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,7 +26,14 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final OpenAiService openAiService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplateWithTimeout();
+
+    private static RestTemplate createRestTemplateWithTimeout() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000); // 5 seconds
+        factory.setReadTimeout(15000);   // 15 seconds
+        return new RestTemplate(factory);
+    }
 
     @Value("${kakao.client-id}")
     private String kakaoClientId;
@@ -147,7 +155,14 @@ public class CustomerService {
     }
 
     private double[] getCoordinatesViaKakao(String address) {
-        String url = "https://dapi.kakao.com/v2/local/search/address.json?query=" + address;
+        if (address == null) {
+            return new double[]{0.0, 0.0};
+        }
+        String queryAddress = address.trim();
+        if (queryAddress.contains(",")) {
+            queryAddress = queryAddress.split(",")[0].trim();
+        }
+        String url = "https://dapi.kakao.com/v2/local/search/address.json?query=" + queryAddress;
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "KakaoAK " + kakaoClientId);
         HttpEntity<?> entity = new HttpEntity<>(headers);
@@ -383,7 +398,7 @@ public class CustomerService {
         return "흐림";
     }
 
-    // 💡 9. 주소 보정 후보 조회 (LLM + 카카오 API 크로스체크)
+    // 💡 9. 주소 보정 실패 고객 목록 조회 (OpenAI 호출 없이 인적정보만 신속 리턴)
     public List<AddressCorrectionDto> getAddressCorrections(User user) {
         List<Customer> allCustomers = customerRepository.findByUserId(user.getId());
         List<AddressCorrectionDto> result = new ArrayList<>();
@@ -391,29 +406,43 @@ public class CustomerService {
         for (Customer c : allCustomers) {
             // 위경도가 null인 주소 보정 실패 고객만 추출
             if (c.getLatitude() == null || c.getLongitude() == null) {
-                List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(c.getAddress());
-                List<AddressCorrectionDto.Candidate> validCandidates = new ArrayList<>();
-
-                for (OpenAiService.RefinedCandidate lc : llmCandidates) {
-                    double[] coords = getCoordinatesViaKakao(lc.refinedAddress);
-                    // 카카오 API 좌표 검증 성공한 후보만 수집
-                    if (coords[0] != 0.0 && coords[1] != 0.0) {
-                        validCandidates.add(AddressCorrectionDto.Candidate.builder()
-                                .refinedAddress(lc.refinedAddress)
-                                .confidence(lc.confidence)
-                                .build());
-                    }
-                }
-
                 result.add(AddressCorrectionDto.builder()
                         .customerId(c.getId())
                         .name(c.getName())
                         .originalAddress(c.getAddress())
-                        .candidates(validCandidates)
+                        .candidates(new ArrayList<>()) // 후보군은 비동기로 개별 요청함
                         .build());
             }
         }
         return result;
+    }
+
+    // 💡 9-2. 특정 고객의 주소 보정 후보군 개별 조회 (비동기 Lazy Loading용)
+    public AddressCorrectionDto getCustomerCorrectionCandidates(Long customerId, User user) {
+        Customer c = customerRepository.findById(customerId)
+                .filter(cust -> cust.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
+
+        List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(c.getAddress());
+        List<AddressCorrectionDto.Candidate> validCandidates = new ArrayList<>();
+
+        for (OpenAiService.RefinedCandidate lc : llmCandidates) {
+            double[] coords = getCoordinatesViaKakao(lc.refinedAddress);
+            if (coords[0] != 0.0 && coords[1] != 0.0) {
+                validCandidates.add(AddressCorrectionDto.Candidate.builder()
+                        .refinedAddress(lc.refinedAddress)
+                        .confidence(lc.confidence)
+                        .build());
+            }
+        }
+
+        return AddressCorrectionDto.builder()
+                .customerId(c.getId())
+                .name(c.getName())
+                .originalAddress(c.getAddress())
+                .candidates(validCandidates)
+                .build();
     }
 
     // 💡 10. 신뢰도 높음(HIGH) 주소 자동 일괄 적용
