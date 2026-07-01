@@ -112,6 +112,11 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.getAddressCorrections(user));
     }
 
+    @GetMapping("/{customerId}/correction-candidates")
+    public ResponseEntity<?> getCustomerCorrectionCandidates(@PathVariable("customerId") Long customerId, @LoginUser User user) {
+        return ResponseEntity.ok(customerService.getCustomerCorrectionCandidates(customerId, user));
+    }
+
     @PostMapping("/apply-corrections-bulk")
     public ResponseEntity<?> applyCorrectionsBulk(@LoginUser User user) {
         return ResponseEntity.ok(customerService.applyCorrectionsBulk(user));

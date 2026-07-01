@@ -147,7 +147,15 @@ export class CustomerApi implements CustomerRepository {
     return await response.json();
   }
 
-  async applyCorrectionsBulk(): Promise<{ updated_count: number } | null> {
+  async getCorrectionCandidates(customerId: number): Promise<AddressCorrection> {
+    const response = await httpClient.request(`/api/customers/${customerId}/correction-candidates`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch correction candidates for customer ${customerId}`);
+    }
+    return await response.json();
+  }
+
+  async applyCorrectionsBulk(): Promise<{ updatedCount: number } | null> {
     const response = await httpClient.request("/api/customers/apply-corrections-bulk", {
       method: "POST",
     });

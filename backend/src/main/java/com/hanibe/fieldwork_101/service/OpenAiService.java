@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -21,8 +23,16 @@ public class OpenAiService {
     @Value("${openai.model:gpt-5.4-mini}")
     private String modelName;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplateWithTimeout();
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static RestTemplate createRestTemplateWithTimeout() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000); // 5 seconds
+        factory.setReadTimeout(15000);   // 15 seconds
+        return new RestTemplate(factory);
+    }
+    private final Map<String, List<RefinedCandidate>> suggestionCache = new ConcurrentHashMap<>();
 
     public static class RefinedCandidate {
         public String refinedAddress;
@@ -30,6 +40,14 @@ public class OpenAiService {
     }
 
     public List<RefinedCandidate> suggestCorrections(String originalAddress) {
+        if (originalAddress == null || originalAddress.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        String cleanAddress = originalAddress.trim();
+        if (suggestionCache.containsKey(cleanAddress)) {
+            return suggestionCache.get(cleanAddress);
+        }
+
         if (apiKey == null || apiKey.trim().isEmpty()) {
             System.err.println("OpenAI API Key is not configured. Returning empty suggestions.");
             return new ArrayList<>();
@@ -44,9 +62,10 @@ public class OpenAiService {
         String systemPrompt = "너는 한국의 주소를 정규화하고 교정하는 AI 전문 비서야. " +
                 "사용자가 제공한 오타가 있거나, 지저분하거나, 잘못 쓰인 한국 주소를 분석해서, " +
                 "실제 카카오맵이나 네이버 지도 등 주소 검색 엔진이 성공적으로 위경도 좌표로 바꿀 수 있는 표준 도로명 주소 또는 지번 주소 후보를 1개에서 최대 2개 추천해줘. " +
-                "원래 주소에 상세 호수(예: 3층, 501호 등)나 괄호가 포함되어 있다면, 그 부분을 제외하고 정확한 지번이나 도로명 건물 번호까지만 정규화된 형태를 추천해야해. " +
+                "원래 주소에 상세 건물 층수, 호수, 동(예: 3층, 501호, 102동 등)이 포함되어 있다면 절대 이를 유실하거나 생략하지 말고, 표준 도로명/지번 뒤에 반드시 쉼표(`,`)를 붙이고 상세 정보를 이어서 적어줘. " +
+                "예를 들어, '가래여울길142층'은 '서울 강동구 가래여울길 14, 2층'과 같이 도로명 뒤에 쉼표와 함께 상세 호수를 붙여야 해. " +
                 "결과는 반드시 다음 형태의 JSON 배열 구조로만 대답해줘. 어떠한 부가 설명이나 Markdown 백틱 기호(```json 등)도 포함하지 말고, 순수 JSON 문자열만 리턴해. " +
-                "[{\"refinedAddress\": \"경기 성남시 분당구 판교역로 231\", \"confidence\": \"HIGH\"}, {\"refinedAddress\": \"경기 성남시 분당구 판교역로 239\", \"confidence\": \"MEDIUM\"}] " +
+                "[{\"refinedAddress\": \"경기 성남시 분당구 판교역로 231, 3층\", \"confidence\": \"HIGH\"}, {\"refinedAddress\": \"경기 성남시 분당구 판교역로 239, 2층\", \"confidence\": \"MEDIUM\"}] " +
                 "신뢰도(confidence)는 HIGH(보정이 아주 명확함), MEDIUM(일부 추정 필요), LOW(불명확함) 중 하나여야 해.";
 
         Map<String, Object> requestBody = Map.of(
@@ -89,6 +108,7 @@ public class OpenAiService {
                                     result.add(candidate);
                                 }
                             }
+                            suggestionCache.put(cleanAddress, result);
                             return result;
                         }
                     }
@@ -96,6 +116,7 @@ public class OpenAiService {
             }
         } catch (Exception e) {
             System.err.println("OpenAI API call failed: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return new ArrayList<>();

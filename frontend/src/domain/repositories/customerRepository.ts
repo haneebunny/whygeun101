@@ -12,5 +12,6 @@ export interface CustomerRepository {
   addCustomer(name: string, address: string, phone: string, modelName: string, serviceType: string): Promise<boolean>;
   updateMemo(customerId: number, memo: string): Promise<boolean>;
   getAddressCorrections(): Promise<AddressCorrection[]>;
-  applyCorrectionsBulk(): Promise<{ updated_count: number } | null>;
+  getCorrectionCandidates(customerId: number): Promise<AddressCorrection>;
+  applyCorrectionsBulk(): Promise<{ updatedCount: number } | null>;
 }
