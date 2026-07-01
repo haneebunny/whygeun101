@@ -1,5 +1,6 @@
 package com.hanibe.fieldwork_101.service;
 
+import com.hanibe.fieldwork_101.dto.AddressCorrectionDto;
 import com.hanibe.fieldwork_101.entity.Customer;
 import com.hanibe.fieldwork_101.entity.User;
 import com.hanibe.fieldwork_101.repository.CustomerRepository;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final OpenAiService openAiService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${kakao.client-id}")
@@ -379,5 +381,65 @@ public class CustomerService {
         if (code >= 80 && code <= 82) return "소나기";
         if (code >= 95 && code <= 99) return "뇌우";
         return "흐림";
+    }
+
+    // 💡 9. 주소 보정 후보 조회 (LLM + 카카오 API 크로스체크)
+    public List<AddressCorrectionDto> getAddressCorrections(User user) {
+        List<Customer> allCustomers = customerRepository.findByUserId(user.getId());
+        List<AddressCorrectionDto> result = new ArrayList<>();
+
+        for (Customer c : allCustomers) {
+            // 위경도가 null인 주소 보정 실패 고객만 추출
+            if (c.getLatitude() == null || c.getLongitude() == null) {
+                List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(c.getAddress());
+                List<AddressCorrectionDto.Candidate> validCandidates = new ArrayList<>();
+
+                for (OpenAiService.RefinedCandidate lc : llmCandidates) {
+                    double[] coords = getCoordinatesViaKakao(lc.refinedAddress);
+                    // 카카오 API 좌표 검증 성공한 후보만 수집
+                    if (coords[0] != 0.0 && coords[1] != 0.0) {
+                        validCandidates.add(AddressCorrectionDto.Candidate.builder()
+                                .refinedAddress(lc.refinedAddress)
+                                .confidence(lc.confidence)
+                                .build());
+                    }
+                }
+
+                result.add(AddressCorrectionDto.builder()
+                        .customerId(c.getId())
+                        .name(c.getName())
+                        .originalAddress(c.getAddress())
+                        .candidates(validCandidates)
+                        .build());
+            }
+        }
+        return result;
+    }
+
+    // 💡 10. 신뢰도 높음(HIGH) 주소 자동 일괄 적용
+    public Map<String, Integer> applyCorrectionsBulk(User user) {
+        List<Customer> allCustomers = customerRepository.findByUserId(user.getId());
+        int updatedCount = 0;
+
+        for (Customer c : allCustomers) {
+            if (c.getLatitude() == null || c.getLongitude() == null) {
+                List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(c.getAddress());
+                for (OpenAiService.RefinedCandidate lc : llmCandidates) {
+                    // 신뢰도가 HIGH인 후보만 대상
+                    if ("HIGH".equalsIgnoreCase(lc.confidence)) {
+                        double[] coords = getCoordinatesViaKakao(lc.refinedAddress);
+                        if (coords[0] != 0.0 && coords[1] != 0.0) {
+                            c.setAddress(lc.refinedAddress);
+                            c.setLatitude(coords[0]);
+                            c.setLongitude(coords[1]);
+                            customerRepository.save(c);
+                            updatedCount++;
+                            break; // 첫 번째 일치하는 HIGH 후보를 적용 후 루프 탈출
+                        }
+                    }
+                }
+            }
+        }
+        return Map.of("updatedCount", updatedCount);
     }
 }

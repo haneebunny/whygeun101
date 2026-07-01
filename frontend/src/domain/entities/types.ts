@@ -35,3 +35,15 @@ export interface UserProfile {
   email: string;
   level: string;
 }
+
+export interface AddressCorrectionCandidate {
+  refined_address: string;
+  confidence: string;
+}
+
+export interface AddressCorrection {
+  customer_id: number;
+  name: string;
+  original_address: string;
+  candidates: AddressCorrectionCandidate[];
+}

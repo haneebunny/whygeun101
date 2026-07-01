@@ -106,4 +106,14 @@ public class CustomerController {
         Map<String, Object> data = customerService.getWeatherData(lat, lng);
         return ResponseEntity.ok(data);
     }
+
+    @GetMapping("/corrections")
+    public ResponseEntity<?> getAddressCorrections(@LoginUser User user) {
+        return ResponseEntity.ok(customerService.getAddressCorrections(user));
+    }
+
+    @PostMapping("/apply-corrections-bulk")
+    public ResponseEntity<?> applyCorrectionsBulk(@LoginUser User user) {
+        return ResponseEntity.ok(customerService.applyCorrectionsBulk(user));
+    }
 }
