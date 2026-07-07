@@ -98,6 +98,12 @@ export default function KakaoMap({
       }
     };
 
+    (window as any).reactToggleAbsentFromMap = (id: number, absent: boolean) => {
+      if ((window as any).reactToggleAbsentHook) {
+        (window as any).reactToggleAbsentHook(id, absent);
+      }
+    };
+
     (window as any).reactEditTimeFromMap = (id: number, currentVal: string) => {
       if ((window as any).reactEditTimeHook) {
         (window as any).reactEditTimeHook(id, currentVal);
@@ -259,6 +265,8 @@ export default function KakaoMap({
           const markerOverlay = new window.kakao.maps.Marker({
             position: markerPosition,
             image: markerImage,
+            opacity: customer.absent ? 0.5 : 1.0,
+            zIndex: customer.absent ? 4 : 3,
           });
           markerOverlay.setMap(mapRef.current);
           overlaysRef.current.push(markerOverlay);
@@ -267,6 +275,7 @@ export default function KakaoMap({
             position: markerPosition,
             content: getLabelHTML(customer),
             yAnchor: -0.2,
+            zIndex: customer.absent ? 2 : 1,
           });
           labelOverlay.setMap(mapRef.current);
           overlaysRef.current.push(labelOverlay);
@@ -276,7 +285,7 @@ export default function KakaoMap({
             position: markerPosition,
             xAnchor: 0.5,
             yAnchor: 1.1,
-            zIndex: 10,
+            zIndex: 20,
             clickable: true,
           });
 
@@ -308,9 +317,12 @@ export default function KakaoMap({
             imgSrc,
             new window.kakao.maps.Size(20, 20),
           );
+          const anyAbsent = group.some((c) => c.absent);
           const markerOverlay = new window.kakao.maps.Marker({
             position: markerPosition,
             image: markerImage,
+            opacity: anyAbsent ? 0.5 : 1.0,
+            zIndex: anyAbsent ? 4 : 3,
           });
           markerOverlay.setMap(mapRef.current);
           overlaysRef.current.push(markerOverlay);
@@ -331,7 +343,7 @@ export default function KakaoMap({
             content: groupBubbleContent,
             yAnchor: 1,
             xAnchor: 0.5,
-            zIndex: 9,
+            zIndex: anyAbsent ? 9 : 8,
             clickable: true,
           });
           bubbleOverlay.setMap(mapRef.current);
@@ -356,7 +368,7 @@ export default function KakaoMap({
             position: markerPosition,
             xAnchor: 0.5,
             yAnchor: 1.1,
-            zIndex: 10,
+            zIndex: 20,
             clickable: true,
           });
 

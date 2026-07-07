@@ -47,6 +47,29 @@ export const getTagsHTML = (c: Customer) => {
   return `<div class="tags-container">${serviceBadge}${modelBadge}</div>`;
 };
 
+export const getStatusColors = (status: string | null | undefined) => {
+  if (status === "완료") {
+    return {
+      bg: "#eff6ff",
+      border: "#bfdbfe",
+      text: "#2563eb",
+    };
+  }
+  if (status === "컨택") {
+    return {
+      bg: "#fffbeb",
+      border: "#fde68a",
+      text: "#d97706",
+    };
+  }
+  // 기본값 (미컨택)
+  return {
+    bg: "#ffe4e6",
+    border: "#fca5a5",
+    text: "#e11d48",
+  };
+};
+
 export const getLabelHTML = (c: Customer) => {
   const shortService = getShortServiceType(c.service_type || "");
   const shortModel = getShortModelName(c.model_name || "");
@@ -60,10 +83,17 @@ export const getLabelHTML = (c: Customer) => {
       : "";
     tags = `<div style="display:flex; gap:1.5px; margin-bottom:1px; pointer-events:none;">${sBadge}${mBadge}</div>`;
   }
+  const colors = getStatusColors(c.status);
+  const absentTag = c.absent
+    ? `<span style="background-color:${colors.bg}; color:${colors.text}; border:1px solid ${colors.border}; font-size:8.5px; font-weight:900; padding:0px 2.5px; border-radius:9999px; margin-right:1px; display:inline-flex; align-items:center; justify-content:center; line-height:1; pointer-events:none; box-shadow: 0 1px 2px rgba(0,0,0,0.02); height: 13.5px; letter-spacing:-0.2px;">부</span>`
+    : "";
   return `
     <div style="display:flex; flex-direction:column; align-items:center; gap:0px; pointer-events:none; transform: translateY(-4px);">
       ${tags}
-      <span class="marker-label" style="pointer-events:none; margin-top:-1px;">${c.name}</span>
+      <div style="display:flex; align-items:center; pointer-events:none;">
+        ${absentTag}
+        <span class="marker-label" style="pointer-events:none; margin-top:-1px;">${c.name}</span>
+      </div>
     </div>
   `;
 };
@@ -87,23 +117,23 @@ export const getMajorityStatus = (group: Customer[]) => {
 
 export const formatVisitTime = (visitTimeStr: string | null | undefined): string => {
   if (!visitTimeStr) return "지정 안 됨";
-  
+
   // Format: "YYYY-MM-DD HH:mm"
   const parts = visitTimeStr.split(" ");
   const datePart = parts[0];
   const timePart = parts[1] || "";
-  
+
   const datePieces = datePart.split("-");
   if (datePieces.length !== 3) return visitTimeStr;
-  
+
   const year = datePieces[0];
   const month = parseInt(datePieces[1], 10);
   const date = parseInt(datePieces[2], 10);
-  
+
   const dateObj = new Date(parseInt(year, 10), month - 1, date);
   const days = ["일", "월", "화", "수", "목", "금", "토"];
   const dayName = days[dateObj.getDay()];
-  
+
   const formattedDate = `${year}년 ${month}월 ${date}일(${dayName})`;
   return timePart ? `${formattedDate} ${timePart}` : formattedDate;
 };
@@ -119,18 +149,25 @@ export const generateSingleHTML = (customer: Customer, groupId: string) => {
       : customer.status === "컨택"
         ? "contact"
         : "none";
-  
+
   const favoriteChar = customer.favorite ? "★" : "☆";
   const visitTimeDisplay = customer.visit_time
     ? `⏰ ${formatVisitTime(customer.visit_time)}`
     : "⏰ 미지정";
 
+  const colors = getStatusColors(customer.status);
+  const absentColor = customer.absent ? colors.text : "#64748b";
+  const absentBg = customer.absent ? colors.bg : "#f1f5f9";
+  const absentBorder = customer.absent ? colors.border : "#e2e8f0";
+  const absentText = customer.absent ? "부재중" : "부재등록";
+
   return `
     <div class="custom-popup single-popup" onwheel="event.stopPropagation()" ontouchmove="event.stopPropagation()" onmousedown="event.stopPropagation()">
       <button class="custom-popup-close" onclick="window.closeMapPopup('${groupId}')">✕</button>
-      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding-right:20px;">
-        <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; padding-right:20px; flex-wrap:wrap;">
+        <span style="font-weight:900; font-size:14px; color:#0f172a; max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${customer.name}</span>
         <button onclick="window.reactToggleFavoriteFromMap(${customer.id}, ${!customer.favorite})" class="star-btn" style="border:none; background:none; cursor:pointer; color:#fbbf24; font-size:16px; padding:0; line-height:1;">${favoriteChar}</button>
+        <button onclick="window.reactToggleAbsentFromMap(${customer.id}, ${!customer.absent})" class="absent-map-btn" style="border:1px solid ${absentBorder}; background:${absentBg}; color:${absentColor}; cursor:pointer; font-size:9.5px; font-weight:800; padding:1.5px 5px; border-radius:5px; line-height:1; display:flex; align-items:center; gap:2px; transition: all 0.2s;">${absentText}</button>
         <span id="badge_${customer.id}" class="group-status-badge ${statusClass}">${customer.status || "미컨택"}</span>
       </div>
       ${getTagsHTML(customer)}
@@ -176,13 +213,20 @@ export const generateGroupItemHTML = (customer: Customer, groupId: string) => {
     ? `⏰ ${formatVisitTime(customer.visit_time)}`
     : "⏰ 미지정";
 
+  const colors = getStatusColors(customer.status);
+  const absentColor = customer.absent ? colors.text : "#64748b";
+  const absentBg = customer.absent ? colors.bg : "#f1f5f9";
+  const absentBorder = customer.absent ? colors.border : "#e2e8f0";
+  const absentText = customer.absent ? "부재" : "부재";
+
   return `
     <div class="group-item">
       <div class="group-item-header">
-        <div style="display:flex; flex-direction:column; gap:4px; max-width: 130px;" onclick="window.toggleGroupItem(${customer.id}); if(window.reactSelectCustomer) { window.reactSelectCustomer(${customer.id}); }">
-          <div style="display:flex; align-items:center; gap:4px;">
+        <div style="display:flex; flex-direction:column; gap:4px; max-width: 140px;" onclick="window.toggleGroupItem(${customer.id}); if(window.reactSelectCustomer) { window.reactSelectCustomer(${customer.id}); }">
+          <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
             <span class="group-item-name">${customer.name}</span>
             <button onclick="event.stopPropagation(); window.reactToggleFavoriteFromMap(${customer.id}, ${!customer.favorite})" class="star-btn" style="border:none; background:none; cursor:pointer; color:#fbbf24; font-size:14px; padding:0; line-height:1;">${favoriteChar}</button>
+            <button onclick="event.stopPropagation(); window.reactToggleAbsentFromMap(${customer.id}, ${!customer.absent})" class="absent-map-btn" style="border:1px solid ${absentBorder}; background:${absentBg}; color:${absentColor}; cursor:pointer; font-size:8.5px; font-weight:800; padding:1px 3.5px; border-radius:4.5px; line-height:1; display:flex; align-items:center; gap:1px; transition: all 0.2s;">${absentText}</button>
           </div>
           ${getTagsHTML(customer)}
         </div>

@@ -204,9 +204,10 @@
 
 .tags-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 4.5px;
   margin-bottom: 4px;
+  align-items: center;
 }
 .tag-badge {
   font-size: 9.5px;
@@ -214,6 +215,7 @@
   padding: 2px 5px;
   border-radius: 4px;
   letter-spacing: -0.3px;
+  white-space: nowrap;
 }
 .model-tag {
   background: #f1f5f9;

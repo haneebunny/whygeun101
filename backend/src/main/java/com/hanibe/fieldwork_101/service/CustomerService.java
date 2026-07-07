@@ -223,6 +223,7 @@ public class CustomerService {
                         Map.entry("model_name", c.getModelName() != null ? c.getModelName() : ""),
                         Map.entry("service_type", c.getServiceType() != null ? c.getServiceType() : ""),
                         Map.entry("favorite", c.getFavorite() != null ? c.getFavorite() : false),
+                        Map.entry("absent", c.getAbsent() != null ? c.getAbsent() : false),
                         Map.entry("visit_time", c.getVisitTime() != null ? c.getVisitTime() : ""),
                         Map.entry("memo", c.getMemo() != null ? c.getMemo() : "")
                 ));
@@ -233,6 +234,7 @@ public class CustomerService {
                         "name", c.getName(),
                         "address", c.getAddress(),
                         "favorite", c.getFavorite() != null ? c.getFavorite() : false,
+                        "absent", c.getAbsent() != null ? c.getAbsent() : false,
                         "visit_time", c.getVisitTime() != null ? c.getVisitTime() : "",
                         "memo", c.getMemo() != null ? c.getMemo() : ""
                 ));
@@ -258,6 +260,16 @@ public class CustomerService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
 
         customer.setFavorite(favorite);
+        customerRepository.save(customer);
+    }
+
+    // 💡 7-2. 고객 부재중 상태 토글
+    public void updateCustomerAbsent(Long customerId, boolean absent, User user) {
+        Customer customer = customerRepository.findById(customerId)
+                .filter(c -> c.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
+
+        customer.setAbsent(absent);
         customerRepository.save(customer);
     }
 

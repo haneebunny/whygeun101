@@ -12,6 +12,7 @@ interface MapTabProps {
   customers: Customer[];
   backendIp: string;
   onToggleStar: (id: number, favorite: boolean) => void;
+  onToggleAbsent: (id: number, absent: boolean) => void;
   onUpdateVisitTime: (id: number, time: string | null) => void;
   onUpdateStatus: (id: number, status: string) => void;
   setActiveTab: (tab: string) => void;
@@ -21,11 +22,12 @@ export default function MapTab({
   customers,
   backendIp,
   onToggleStar,
+  onToggleAbsent,
   onUpdateVisitTime,
   onUpdateStatus,
   setActiveTab,
 }: MapTabProps) {
-  const { getDisplayLabel } = useStatus();
+  const { getDisplayLabel, statusLabels } = useStatus();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("전체");
   
@@ -47,12 +49,13 @@ export default function MapTab({
 
       const matchesStatus =
         statusFilter === "전체" ||
-        (statusFilter === "미컨택" && (!c.status || c.status === "미컨택")) ||
+        (statusFilter === "부재중" && !!c.absent) ||
+        (statusFilter === statusLabels.none && (!c.status || c.status === "미컨택" || c.status === statusLabels.none)) ||
         c.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [customers, searchTerm, statusFilter]);
+  }, [customers, searchTerm, statusFilter, statusLabels]);
 
   // Derive visible customers currently in the viewport bounds
   const viewportCustomers = useMemo(() => {
@@ -63,6 +66,10 @@ export default function MapTab({
   useEffect(() => {
     (window as any).reactToggleFavoriteHook = (id: number, favorite: boolean) => {
       onToggleStar(id, favorite);
+    };
+
+    (window as any).reactToggleAbsentHook = (id: number, absent: boolean) => {
+      onToggleAbsent(id, absent);
     };
 
     (window as any).reactEditTimeHook = (id: number, currentVal: string) => {
@@ -76,10 +83,11 @@ export default function MapTab({
 
     return () => {
       delete (window as any).reactToggleFavoriteHook;
+      delete (window as any).reactToggleAbsentHook;
       delete (window as any).reactEditTimeHook;
       delete (window as any).reactUpdateStatusHook;
     };
-  }, [onToggleStar, onUpdateStatus]);
+  }, [onToggleStar, onToggleAbsent, onUpdateStatus]);
 
   const handleNaviOpen = (type: "tmap" | "nmap", customer: Customer) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -143,12 +151,12 @@ export default function MapTab({
 
         {/* Filter chips list */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {["미컨택", "컨택", "완료", "전체"].map((status) => {
+          {[statusLabels.none, "컨택", "완료", "부재중", "전체"].map((status) => {
             const isSelected = statusFilter === status;
             let activeStyle = "";
             let defaultStyle = "";
 
-            if (status === "미컨택") {
+            if (status === statusLabels.none) {
               activeStyle = "bg-[#E87B72]/20 text-[#E87B72] border border-[#E87B72]/30 font-extrabold";
               defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#E87B72]/10";
             } else if (status === "컨택") {
@@ -157,6 +165,9 @@ export default function MapTab({
             } else if (status === "완료") {
               activeStyle = "bg-[#5B9CF6]/20 text-[#5B9CF6] border border-[#5B9CF6]/30 font-extrabold";
               defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#5B9CF6]/10";
+            } else if (status === "부재중") {
+              activeStyle = "bg-rose-500/20 text-rose-600 border border-rose-500/30 font-extrabold";
+              defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-rose-500/10";
             } else {
               activeStyle = "bg-[#4F8EF7]/20 text-[#4F8EF7] border border-[#4F8EF7]/30 font-extrabold";
               defaultStyle = "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#4F8EF7]/10";

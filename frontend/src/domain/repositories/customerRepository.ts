@@ -8,6 +8,7 @@ export interface CustomerRepository {
   clearAllCustomers(): Promise<boolean>;
   uploadExcel(file: File): Promise<{ addedCount: number; deletedCount: number } | null>;
   toggleFavorite(customerId: number, favorite: boolean): Promise<boolean>;
+  toggleAbsent(customerId: number, absent: boolean): Promise<boolean>;
   updateVisitTime(customerId: number, visitTime: string | null): Promise<boolean>;
   addCustomer(name: string, address: string, phone: string, modelName: string, serviceType: string): Promise<boolean>;
   updateMemo(customerId: number, memo: string): Promise<boolean>;

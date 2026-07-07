@@ -10,7 +10,7 @@ spring:
 
   datasource:
     # 내 컴퓨터면 H2를 쓰고, Render(환경변수)면 그 주소를 쓰도록 자동 분기
-    url: ${DB_URL:jdbc:h2:mem:testdb;MODE=MySQL}
+    url: ${DB_URL:jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1}
     username: ${DB_USER:sa}
     password: ${DB_PASSWORD:}
     driver-class-name: ${DB_DRIVER:org.h2.Driver}

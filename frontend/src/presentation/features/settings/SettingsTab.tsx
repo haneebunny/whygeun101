@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useStatus } from "../../components/StatusContext";
+import { useAlert } from "../../components/AlertContext";
 import { authRepository } from "../../../data/repositories/authApi";
 
 interface SettingsTabProps {
@@ -16,11 +17,27 @@ export default function SettingsTab({
   backendIp,
 }: SettingsTabProps) {
   const { statusLabels, updateStatusLabel } = useStatus();
+  const { showAlert } = useAlert();
+
+  const [localNone, setLocalNone] = useState(statusLabels.none);
+  const [localContact, setLocalContact] = useState(statusLabels.contact);
+  const [localDone, setLocalDone] = useState(statusLabels.done);
 
   const [isAlertEnabled, setIsAlertEnabled] = useState(true);
   const [alertTime, setAlertTime] = useState("30분 전");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editedNickname, setEditedNickname] = useState(nickname);
+
+  const handleSaveStatusLabels = () => {
+    updateStatusLabel("none", localNone);
+    updateStatusLabel("contact", localContact);
+    updateStatusLabel("done", localDone);
+    showAlert({
+      title: "설정 저장 완료",
+      message: "고객 상태 라벨 설정이 성공적으로 저장되었습니다.",
+      type: "success",
+    });
+  };
 
   const handleProfileSave = async () => {
     if (editedNickname.trim()) {
@@ -123,8 +140,8 @@ export default function SettingsTab({
             <div className="flex items-center gap-1">
               <input
                 type="text"
-                value={statusLabels.none}
-                onChange={(e) => updateStatusLabel("none", e.target.value)}
+                value={localNone}
+                onChange={(e) => setLocalNone(e.target.value)}
                 className="bg-transparent border-0 outline-none text-right text-[12.5px] font-bold text-slate-700 max-w-[100px] border-b border-slate-300/20 focus:border-primary"
               />
               <span className="text-slate-400 font-bold text-[10px] ml-0.5">❯</span>
@@ -139,8 +156,8 @@ export default function SettingsTab({
             <div className="flex items-center gap-1">
               <input
                 type="text"
-                value={statusLabels.contact}
-                onChange={(e) => updateStatusLabel("contact", e.target.value)}
+                value={localContact}
+                onChange={(e) => setLocalContact(e.target.value)}
                 className="bg-transparent border-0 outline-none text-right text-[12.5px] font-bold text-slate-700 max-w-[100px] border-b border-slate-300/20 focus:border-primary"
               />
               <span className="text-slate-400 font-bold text-[10px] ml-0.5">❯</span>
@@ -155,13 +172,20 @@ export default function SettingsTab({
             <div className="flex items-center gap-1">
               <input
                 type="text"
-                value={statusLabels.done}
-                onChange={(e) => updateStatusLabel("done", e.target.value)}
+                value={localDone}
+                onChange={(e) => setLocalDone(e.target.value)}
                 className="bg-transparent border-0 outline-none text-right text-[12.5px] font-bold text-slate-700 max-w-[100px] border-b border-slate-300/20 focus:border-primary"
               />
               <span className="text-slate-400 font-bold text-[10px] ml-0.5">❯</span>
             </div>
           </div>
+
+          <button
+            onClick={handleSaveStatusLabels}
+            className="w-full mt-1.5 py-3 bg-primary hover:bg-primary/95 text-white font-extrabold text-[12.5px] rounded-xl transition shadow-md shadow-primary/10 cursor-pointer"
+          >
+            적용 완료
+          </button>
         </div>
       </section>
 
