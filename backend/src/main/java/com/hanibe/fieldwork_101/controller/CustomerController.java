@@ -56,6 +56,15 @@ public class CustomerController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
+    @PutMapping("/{customerId}/absent")
+    public ResponseEntity<?> updateAbsent(@PathVariable Long customerId,
+                                          @RequestBody Map<String, Boolean> body,
+                                          @LoginUser User user) {
+        boolean absent = body.getOrDefault("absent", false);
+        customerService.updateCustomerAbsent(customerId, absent, user);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
     @PutMapping("/{customerId}/visit-time")
     public ResponseEntity<?> updateVisitTime(@PathVariable Long customerId,
                                              @RequestBody Map<String, String> body,

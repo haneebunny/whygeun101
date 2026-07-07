@@ -96,6 +96,20 @@ export class CustomerApi implements CustomerRepository {
     return response.ok;
   }
 
+  async toggleAbsent(
+    customerId: number,
+    absent: boolean,
+  ): Promise<boolean> {
+    const response = await httpClient.request(
+      `/api/customers/${customerId}/absent`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ absent }),
+      },
+    );
+    return response.ok;
+  }
+
   async updateVisitTime(
     customerId: number,
     visitTime: string | null,

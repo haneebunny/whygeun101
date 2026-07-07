@@ -154,6 +154,10 @@ function AddressCorrectionContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const [corrections, setCorrections] = useState<AddressCorrection[]>([]);
   const [candidatesMap, setCandidatesMap] = useState<Record<number, AddressCorrectionCandidate[]>>({});
   const [unprocessedOnly, setUnprocessedOnly] = useState(true);
@@ -559,8 +563,8 @@ function AddressCorrectionContent() {
 
       {/* 5. 상세 주소 직접 보정 모달 */}
       {showDetailModal && selectedCorrection && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-[4px] animate-fade-in">
-          <div className="bg-white/95 backdrop-blur-xl w-full max-w-sm p-6 rounded-3xl border border-slate-100 shadow-2xl flex flex-col gap-4 animate-scale-up">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-5 z-[100] transition-all animate-fadeIn">
+          <div className="bg-white/95 backdrop-blur-xl w-full max-w-sm p-6 rounded-3xl border border-slate-100 shadow-2xl flex flex-col gap-4 animate-scaleUp">
             <div>
               <h3 className="text-[15.5px] font-black text-slate-800">📍 상세 직접 보정</h3>
               <p className="text-[11px] text-slate-400 mt-0.5">카카오 검색이 가능하도록 표준 주소(동/호수 제외)를 기입해 주세요.</p>

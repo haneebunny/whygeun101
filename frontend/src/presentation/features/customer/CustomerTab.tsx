@@ -17,6 +17,7 @@ interface CustomerTabProps {
   onClearAll: () => void;
   onRefresh: () => Promise<void>;
   onToggleStar: (id: number, favorite: boolean) => void;
+  onToggleAbsent: (id: number, absent: boolean) => void;
   onUpdateVisitTime: (id: number, time: string | null) => void;
   onUpdateStatus: (id: number, status: string) => void;
   onEditAddress: (id: number, address: string) => Promise<boolean>;
@@ -32,6 +33,7 @@ export default function CustomerTab({
   onClearAll,
   onRefresh,
   onToggleStar,
+  onToggleAbsent,
   onUpdateVisitTime,
   onUpdateStatus,
   onEditAddress,
@@ -153,9 +155,9 @@ export default function CustomerTab({
     return validCustomers.filter((c) => {
       const matchesSearch = searchTerm
         ? Hangul.search(c.name || "", searchTerm) !== -1 ||
-          Hangul.search(c.address || "", searchTerm) !== -1 ||
-          (c.phone &&
-            c.phone.replace(/-/g, "").includes(searchTerm.replace(/-/g, "")))
+        Hangul.search(c.address || "", searchTerm) !== -1 ||
+        (c.phone &&
+          c.phone.replace(/-/g, "").includes(searchTerm.replace(/-/g, "")))
         : true;
 
       if (selectedFilters.length === 0) return matchesSearch;
@@ -182,7 +184,7 @@ export default function CustomerTab({
         });
       }
 
-      // 그 외 필터들 (일정 있음, ⭐): 이들은 AND 조건으로 추가 만족해야 함
+      // 그 외 필터들 (일정 있음, ⭐, 부재중): 이들은 AND 조건으로 추가 만족해야 함
       const extraFilters = selectedFilters.filter(
         (f) => !["미컨택", statusLabels.none, "컨택", "완료"].includes(f),
       );
@@ -192,6 +194,9 @@ export default function CustomerTab({
         }
         if (filter === "⭐") {
           return !!c.favorite;
+        }
+        if (filter === "부재중") {
+          return !!c.absent;
         }
         return true;
       });
@@ -349,7 +354,7 @@ export default function CustomerTab({
             <span className="w-5 h-5 flex items-center justify-center bg-rose-500/20 rounded-full text-xs">
               ⚠️
             </span>
-            주소 오류 목록 ({failedCustomers.length}건)이 있습니다. 보정하러 가기
+            주소 오류 목록 ({failedCustomers.length}건)
           </div>
           <svg
             width="16"
@@ -367,7 +372,7 @@ export default function CustomerTab({
 
       {/* Status Chips */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {[statusLabels.none, "컨택", "완료", "일정 있음", "⭐", "전체"].map(
+        {[statusLabels.none, "컨택", "완료", "부재중", "일정 있음", "⭐", "전체"].map(
           (status) => {
             const isSelected =
               status === "전체"
@@ -392,6 +397,11 @@ export default function CustomerTab({
                 "bg-[#5B9CF6]/20 text-[#5B9CF6] border border-[#5B9CF6]/30 font-extrabold";
               defaultStyle =
                 "bg-white/40 text-slate-600 border border-white/20 hover:bg-[#5B9CF6]/10";
+            } else if (status === "부재중") {
+              activeStyle =
+                "bg-rose-500/20 text-rose-600 border border-rose-500/30 font-extrabold";
+              defaultStyle =
+                "bg-white/40 text-slate-600 border border-white/20 hover:bg-rose-500/10";
             } else if (status === "일정 있음") {
               activeStyle =
                 "bg-indigo-500/20 text-indigo-600 border border-indigo-500/30 font-extrabold";
@@ -413,9 +423,8 @@ export default function CustomerTab({
               <button
                 key={status}
                 onClick={() => handleFilterToggle(status)}
-                className={`px-3.5 py-1.5 rounded-full text-[12.5px] transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                  isSelected ? activeStyle : defaultStyle
-                }`}
+                className={`px-3.5 py-1.5 rounded-full text-[12.5px] transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${isSelected ? activeStyle : defaultStyle
+                  }`}
               >
                 <span>{status}</span>
               </button>
@@ -483,7 +492,8 @@ export default function CustomerTab({
             return (
               <div
                 key={customer.id}
-                className="glass-card glass-card-interactive p-4 flex flex-col gap-3 relative overflow-hidden"
+                className={`glass-card glass-card-interactive p-4 flex flex-col gap-3 relative overflow-hidden ${customer.absent ? "border-dashed border-2! border-rose-500/35 shadow-sm" : ""
+                  }`}
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-start gap-1.5 min-w-0">
@@ -500,6 +510,18 @@ export default function CustomerTab({
                           className="text-amber-400 font-bold active:scale-90 transition text-md focus:outline-none cursor-pointer"
                         >
                           {customer.favorite ? "★" : "☆"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            onToggleAbsent(customer.id, !customer.absent);
+                            handleRecentActivity(customer.id);
+                          }}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all border flex items-center gap-1 focus:outline-none cursor-pointer ${customer.absent
+                            ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                            : "bg-slate-100 text-slate-400 border-slate-200/65 hover:bg-slate-200"
+                            }`}
+                        >
+                          {customer.absent ? "부재중" : "부재등록"}
                         </button>
                       </div>
 

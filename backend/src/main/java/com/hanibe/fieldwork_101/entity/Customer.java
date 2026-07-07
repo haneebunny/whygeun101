@@ -28,6 +28,9 @@ public class Customer {
     @Builder.Default
     private Boolean favorite = false;
 
+    @Builder.Default
+    private Boolean absent = false;
+
     private String visitTime;
 
     private String modelName;

@@ -283,6 +283,35 @@ function PageContent() {
     }
   };
 
+  const handleToggleAbsent = async (id: number, absent: boolean) => {
+    if (!requireAuth("부재중 설정")) return;
+    try {
+      const ok = await customerRepository.toggleAbsent(id, absent);
+      if (ok) {
+        setSuccessCustomers((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, absent } : c)),
+        );
+        setFailedCustomers((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, absent } : c)),
+        );
+      } else {
+        showAlert({
+          title: "부재중 설정 실패",
+          message: "부재중 설정을 동기화하지 못했습니다.",
+          type: "warning",
+        });
+      }
+    } catch (e: any) {
+      console.error("Failed to toggle absent", e);
+      showAlert({
+        title: "오류 발생",
+        message: "부재중 수정에 실패했습니다.",
+        type: "error",
+        debugInfo: e.stack || e.toString(),
+      });
+    }
+  };
+
   const handleUpdateVisitTime = async (id: number, time: string | null) => {
     if (!requireAuth("일정 변경")) return;
     try {
@@ -535,6 +564,7 @@ function PageContent() {
             customers={successCustomers}
             backendIp={BACKEND_IP}
             onToggleStar={handleToggleStar}
+            onToggleAbsent={handleToggleAbsent}
             onUpdateVisitTime={handleUpdateVisitTime}
             onUpdateStatus={handleUpdateStatus}
             setActiveTab={setActiveTab}
@@ -548,6 +578,7 @@ function PageContent() {
             onClearAll={handleClearAll}
             onRefresh={fetchCustomers}
             onToggleStar={handleToggleStar}
+            onToggleAbsent={handleToggleAbsent}
             onUpdateVisitTime={handleUpdateVisitTime}
             onUpdateStatus={handleUpdateStatus}
             onEditAddress={handleEditAddress}
@@ -588,13 +619,12 @@ function PageContent() {
               </button>
             </div>
           )}
-          {/* 고객 추가 버튼 */}
           <button
             onClick={() => setIsSpeedDialOpen(!isSpeedDialOpen)}
-            className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-xl transition-all ${
+            className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold border border-white/25 backdrop-blur-md transition-all duration-300 shadow-xl ${
               isSpeedDialOpen
-                ? "bg-rose-500 rotate-45 scale-95"
-                : "bg-blue-600 hover:bg-blue-700 hover:scale-105"
+                ? "bg-gradient-to-br from-rose-500/80 to-purple-600/80 rotate-45 scale-95 shadow-[0_4px_16px_rgba(244,63,94,0.3)]"
+                : "bg-gradient-to-br from-blue-500/80 via-indigo-500/80 to-purple-600/80 hover:scale-105 hover:shadow-[0_8px_32px_rgba(99,102,241,0.45)] shadow-[0_8px_24px_rgba(99,102,241,0.35)]"
             }`}
           >
             +

@@ -4,6 +4,7 @@ export interface FailedCustomer {
   name: string;
   address: string;
   favorite?: boolean;
+  absent?: boolean;
   visit_time?: string | null;
   memo?: string;
 }
@@ -26,6 +27,7 @@ export interface Customer {
   model_name?: string;
   service_type?: string;
   favorite?: boolean;
+  absent?: boolean;
   visit_time?: string | null;
   memo?: string;
 }
