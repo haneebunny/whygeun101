@@ -301,7 +301,8 @@ export default function CustomerTab({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-5 pb-24 min-h-[calc(100vh-140px)] relative bg-transparent animate-slide-up">
+    <>
+      <div className="flex flex-col gap-4 p-5 pb-24 min-h-[calc(100vh-140px)] relative bg-transparent animate-slide-up">
       {/* Search Input */}
       <div className="flex items-center gap-2 bg-white/40 border border-white/20 shadow-inner rounded-2xl px-4 py-3 backdrop-blur-md">
         <svg
@@ -700,6 +701,7 @@ export default function CustomerTab({
           고객 불러오는 중...
         </div>
       )}
+      </div>
 
       {/* DateTime Picker Modal */}
       {activeDateTimePickerId !== null && (
@@ -730,6 +732,6 @@ export default function CustomerTab({
           onCancel={() => setActiveMemoId(null)}
         />
       )}
-    </div>
+    </>
   );
 }
