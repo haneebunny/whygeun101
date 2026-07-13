@@ -19,6 +19,9 @@
 ### 3. 서비스 워커(Service Worker) 오류 패치
 * **작업 내용**: [sw.js](file:///Users/hani/Desktop/project/sales-route-map/frontend/public/sw.js)의 `fetch` 이벤트 콜백 함수에서 누락되었던 `event` 인자 정의를 추가하여 `ReferenceError` 버그를 원천 해결했습니다.
 
+### 4. 이용약관(Terms of Service) 페이지 구현
+* **작업 내용**: 설정 탭에서 참조하고 있던 `/terms` 경로에 대응하는 이용약관 정적 페이지([page.tsx](file:///Users/hani/Desktop/project/sales-route-map/frontend/app/terms/page.tsx))를 구현했습니다. 이로써 서비스 내의 빈 링크(404 에러)를 제거하고 서비스 이용 조건, 권리/의무, 책임 제한 등의 조항을 명확히 명시했습니다.
+
 ---
 
 ## 📅 2026-07-01 (수)
