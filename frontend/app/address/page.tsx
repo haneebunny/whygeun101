@@ -8,6 +8,7 @@ import Login from "@/components/Login";
 import { customerRepository } from "@/src/data/repositories/customerApi";
 import { AddressCorrection, AddressCorrectionCandidate } from "@/src/domain/entities/types";
 import { AlertProvider, useAlert } from "@/src/presentation/components/AlertContext";
+import { trackEvent } from "@/src/presentation/utils/mixpanel";
 
 // 💡 개별 비동기 보정 후보 로더 카드 컴포넌트
 interface AddressCorrectionCardProps {
@@ -156,6 +157,7 @@ function AddressCorrectionContent() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    trackEvent("Page View", { page: "/address" });
   }, []);
 
   const [corrections, setCorrections] = useState<AddressCorrection[]>([]);
@@ -233,6 +235,7 @@ function AddressCorrectionContent() {
         try {
           const result = await customerRepository.applyCorrectionsBulk();
           if (result) {
+            trackEvent("Apply Bulk Corrections", { success: true, count: result.updatedCount });
             showAlert({
               title: "일괄 적용 성공",
               message: `${result.updatedCount}건의 주소가 성공적으로 보정되었습니다.`,
@@ -260,6 +263,7 @@ function AddressCorrectionContent() {
     try {
       const result = await customerRepository.updateAddress(customerId, address);
       if (result.success) {
+        trackEvent("Apply Single Correction", { customer_id: customerId, refined_address: address, success: true });
         showAlert({
           title: "주소 확정 완료",
           message: "선택하신 주소로 정상 보정되어 지도 핀이 생성되었습니다.",
@@ -267,6 +271,7 @@ function AddressCorrectionContent() {
         });
         fetchCorrections();
       } else {
+        trackEvent("Apply Single Correction", { customer_id: customerId, refined_address: address, success: false });
         showAlert({
           title: "주소 보정 실패",
           message: "해당 주소의 위경도 좌표를 변환하지 못했습니다. 다른 주소를 시도해주세요.",
@@ -275,6 +280,7 @@ function AddressCorrectionContent() {
       }
     } catch (e: any) {
       console.error(e);
+      trackEvent("Apply Single Correction", { customer_id: customerId, refined_address: address, success: false, error: e.toString() });
       showAlert({
         title: "오류 발생",
         message: "주소 확정 도중 예외가 발생했습니다.",
@@ -301,6 +307,7 @@ function AddressCorrectionContent() {
     try {
       const result = await customerRepository.updateAddress(selectedCorrection.customer_id, customAddress.trim());
       if (result.success) {
+        trackEvent("Apply Custom Correction", { customer_id: selectedCorrection.customer_id, custom_address: customAddress.trim(), success: true });
         showAlert({
           title: "보정 성공",
           message: "직접 입력하신 주소로 보정이 완료되었습니다.",
@@ -309,6 +316,7 @@ function AddressCorrectionContent() {
         setShowDetailModal(false);
         fetchCorrections();
       } else {
+        trackEvent("Apply Custom Correction", { customer_id: selectedCorrection.customer_id, custom_address: customAddress.trim(), success: false });
         showAlert({
           title: "보정 실패",
           message: "입력된 주소로 위경도 좌표를 찾을 수 없습니다. 도로명과 건물 번호가 정확한지 확인해주세요.",
@@ -317,6 +325,7 @@ function AddressCorrectionContent() {
       }
     } catch (e: any) {
       console.error(e);
+      trackEvent("Apply Custom Correction", { customer_id: selectedCorrection.customer_id, custom_address: customAddress.trim(), success: false, error: e.toString() });
       showAlert({
         title: "오류 발생",
         message: "서버 통신 도중 오류가 발생했습니다.",

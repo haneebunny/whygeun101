@@ -4,6 +4,7 @@ import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authRepository } from "@/src/data/repositories/authApi";
 import { useAlert } from "@/src/presentation/components/AlertContext";
+import { identifyUser, trackEvent } from "@/src/presentation/utils/mixpanel";
 
 function CallbackContent() {
   const router = useRouter();
@@ -22,6 +23,10 @@ function CallbackContent() {
         // Save token and nickname to browser local storage
         localStorage.setItem("token", result.token);
         localStorage.setItem("nickname", result.nickname);
+
+        // Track Login in Mixpanel
+        identifyUser(result.token, result.nickname);
+        trackEvent("Login", { method: "Kakao" });
 
         router.push("/"); // Back to home
       } catch (error: any) {

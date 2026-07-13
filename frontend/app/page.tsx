@@ -17,6 +17,7 @@ import {
   useAlert,
 } from "@/src/presentation/components/AlertContext";
 import AddCustomerModal from "@/src/presentation/components/AddCustomerModal";
+import { identifyUser, resetUser, trackEvent } from "@/src/presentation/utils/mixpanel";
 
 function PageContent() {
   const BACKEND_IP = process.env.NEXT_PUBLIC_API_URL || "";
@@ -37,7 +38,10 @@ function PageContent() {
     const storedNickname = localStorage.getItem("nickname");
     if (token) {
       setIsLoggedIn(true);
-      if (storedNickname) setNickname(storedNickname);
+      if (storedNickname) {
+        setNickname(storedNickname);
+        identifyUser(token, storedNickname);
+      }
     }
 
     if (typeof window !== "undefined") {
@@ -50,6 +54,10 @@ function PageContent() {
 
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    trackEvent("Tab View", { tab: activeTab });
+  }, [activeTab]);
 
   // Webview communications receiver
   useEffect(() => {
@@ -129,6 +137,8 @@ function PageContent() {
         setNickname("");
         setSuccessCustomers([]);
         setFailedCustomers([]);
+        resetUser();
+        trackEvent("Logout");
       },
     });
   };
@@ -195,6 +205,7 @@ function PageContent() {
         try {
           const ok = await customerRepository.deleteCustomer(id);
           if (ok) {
+            trackEvent("Delete Customer", { customer_id: id });
             fetchCustomers();
           } else {
             showAlert({
@@ -227,6 +238,7 @@ function PageContent() {
         try {
           const ok = await customerRepository.clearAllCustomers();
           if (ok) {
+            trackEvent("Clear All Customers");
             showAlert({
               title: "초기화 완료",
               message: "전체 데이터가 성공적으로 초기화되었습니다.",
@@ -258,6 +270,7 @@ function PageContent() {
     try {
       const ok = await customerRepository.toggleFavorite(id, favorite);
       if (ok) {
+        trackEvent("Toggle Favorite", { customer_id: id, favorite });
         // Optimistic state update to make stars highly responsive
         setSuccessCustomers((prev) =>
           prev.map((c) => (c.id === id ? { ...c, favorite } : c)),
@@ -288,6 +301,7 @@ function PageContent() {
     try {
       const ok = await customerRepository.toggleAbsent(id, absent);
       if (ok) {
+        trackEvent("Toggle Absent", { customer_id: id, absent });
         setSuccessCustomers((prev) =>
           prev.map((c) => (c.id === id ? { ...c, absent } : c)),
         );
@@ -317,6 +331,7 @@ function PageContent() {
     try {
       const ok = await customerRepository.updateVisitTime(id, time);
       if (ok) {
+        trackEvent("Update Visit Time", { customer_id: id, visit_time: time });
         setSuccessCustomers((prev) =>
           prev.map((c) => (c.id === id ? { ...c, visit_time: time } : c)),
         );
@@ -349,9 +364,11 @@ function PageContent() {
     try {
       const result = await customerRepository.updateAddress(id, address);
       if (result.success) {
+        trackEvent("Update Address", { customer_id: id, success: true });
         await fetchCustomers();
         return true;
       }
+      trackEvent("Update Address", { customer_id: id, success: false });
       showAlert({
         title: "주소 변환 실패",
         message:
@@ -376,6 +393,7 @@ function PageContent() {
     try {
       const ok = await customerRepository.updateStatus(id, status);
       if (ok) {
+        trackEvent("Update Status", { customer_id: id, status });
         setSuccessCustomers((prev) =>
           prev.map((c) => (c.id === id ? { ...c, status } : c)),
         );
@@ -408,6 +426,7 @@ function PageContent() {
       const result = await customerRepository.uploadExcel(file);
       if (result !== null) {
         const { addedCount, deletedCount } = result;
+        trackEvent("Upload Excel", { success: true, added_count: addedCount, deleted_count: deletedCount });
         showAlert({
           title: "업로드 성공",
           message: `엑셀 데이터 연동이 완료되었습니다!\n고객수 + ${addedCount} - ${deletedCount}`,
@@ -416,6 +435,7 @@ function PageContent() {
         await fetchCustomers();
         return true;
       } else {
+        trackEvent("Upload Excel", { success: false });
         showAlert({
           title: "업로드 실패",
           message:
@@ -425,6 +445,7 @@ function PageContent() {
         return false;
       }
     } catch (e: any) {
+      trackEvent("Upload Excel", { success: false, error: e.toString() });
       showAlert({
         title: "업로드 실패",
         message: "엑셀 파일 업로드 중 서버 에러가 발생했습니다.",
@@ -446,6 +467,7 @@ function PageContent() {
     try {
       const ok = await customerRepository.updateMemo(id, memo);
       if (ok) {
+        trackEvent("Update Memo", { customer_id: id });
         setSuccessCustomers((prev) =>
           prev.map((c) => (c.id === id ? { ...c, memo } : c)),
         );
@@ -489,6 +511,7 @@ function PageContent() {
         serviceType,
       );
       if (ok) {
+        trackEvent("Add Customer", { name, service_type: serviceType, model_name: modelName });
         showAlert({
           title: "등록 완료",
           message: `${name} 고객님이 정상적으로 등록되었습니다.`,
@@ -497,6 +520,7 @@ function PageContent() {
         await fetchCustomers();
         return true;
       }
+      trackEvent("Add Customer Failed", { name });
       showAlert({
         title: "등록 실패",
         message:
