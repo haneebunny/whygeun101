@@ -19,6 +19,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
@@ -350,7 +353,7 @@ public class CustomerService {
         return customerRepository.save(customer);
     }
 
-    // 💡 7. 실시간 지역/날씨 조회 (Kakao Coord2RegionCode + Open-Meteo)
+    // 💡 7. 실시간 지역/날씨 조회 (Kakao Coord2RegionCode + Open-Meteo - 3시간 뒤 예보)
     public Map<String, Object> getWeatherData(Double lat, Double lng) {
         if (lat == null || lng == null) {
             // Default to Seoul City Hall
@@ -386,16 +389,48 @@ public class CustomerService {
         double temp = 20.0;
         int weatherCode = 0;
         String openMeteoUrl = String.format(
-            "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current=temperature_2m,weather_code&timezone=auto",
+            "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&hourly=temperature_2m,weather_code&timezone=auto",
             lat, lng
         );
 
+        String targetHourStr = "3시간 뒤";
         try {
             ResponseEntity<Map> response = restTemplate.getForEntity(openMeteoUrl, Map.class);
-            Map<String, Object> current = (Map<String, Object>) response.getBody().get("current");
-            if (current != null) {
-                temp = Double.parseDouble(current.get("temperature_2m").toString());
-                weatherCode = Integer.parseInt(current.get("weather_code").toString());
+            Map<String, Object> body = response.getBody();
+            if (body != null) {
+                String tz = body.containsKey("timezone") ? body.get("timezone").toString() : "Asia/Seoul";
+                Map<String, Object> hourly = (Map<String, Object>) body.get("hourly");
+                if (hourly != null) {
+                    List<String> timeList = (List<String>) hourly.get("time");
+                    List<?> tempList = (List<?>) hourly.get("temperature_2m");
+                    List<?> codeList = (List<?>) hourly.get("weather_code");
+
+                    if (timeList != null && tempList != null && codeList != null) {
+                        LocalDateTime localNow = LocalDateTime.now(ZoneId.of(tz));
+                        LocalDateTime targetTime = localNow.plusHours(3);
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:00");
+                        String targetTimeStr = targetTime.format(formatter);
+                        targetHourStr = targetTime.format(DateTimeFormatter.ofPattern("HH:00"));
+
+                        int targetIndex = -1;
+                        for (int i = 0; i < timeList.size(); i++) {
+                            if (timeList.get(i).startsWith(targetTimeStr)) {
+                                targetIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (targetIndex == -1 || targetIndex >= tempList.size()) {
+                            // fallback to current local hour + 3 if timezone alignment failed
+                            targetIndex = localNow.getHour() + 3;
+                        }
+
+                        if (targetIndex >= 0 && targetIndex < tempList.size()) {
+                            temp = Double.parseDouble(tempList.get(targetIndex).toString());
+                            weatherCode = Integer.parseInt(codeList.get(targetIndex).toString());
+                        }
+                    }
+                }
             }
         } catch (Exception e) {
             System.err.println("Open-Meteo weather fetch failed: " + e.getMessage());
@@ -407,7 +442,8 @@ public class CustomerService {
             "temp", Math.round(temp),
             "condition", condition,
             "region", regionName,
-            "weatherCode", weatherCode
+            "weatherCode", weatherCode,
+            "targetHour", targetHourStr
         );
     }
 

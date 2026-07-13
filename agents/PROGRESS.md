@@ -4,6 +4,23 @@
 
 ---
 
+## 📅 2026-07-13 (월)
+
+### 1. 믹스패널(Mixpanel) 로그 및 유저 행동 트래킹 연동
+* **작업 내용**:
+  * 프론트엔드에 `mixpanel-browser` 라이브러리를 연동하고 SSR 및 개발 디버깅에 안전한 [mixpanel.ts](file:///Users/hani/Desktop/project/sales-route-map/frontend/src/presentation/utils/mixpanel.ts) 헬퍼를 추가했습니다.
+  * 로그인/로그아웃, 메뉴 탭 전환, 엑셀 파일 업로드, 고객 추가/삭제/수정, AI 주소 보정 적용 등 전반적인 사용자 행동을 트래킹하도록 이벤트를 바인딩했습니다.
+  * 로컬 개발 도중에도 토큰 유무와 상관없이 브라우저 콘솔을 통해 트래킹 상태를 점검할 수 있도록 실시간 `📊 [Mixpanel Event]` 로그 출력을 연동했습니다.
+
+### 2. 3시간 뒤 예보 날씨 제공 및 홈 탭 UI 최적화
+* **백엔드**: [CustomerService.java](file:///Users/hani/Desktop/project/sales-route-map/backend/src/main/java/com/hanibe/fieldwork_101/service/CustomerService.java)에서 Open-Meteo API 호출 방식을 `hourly`로 개편하고, 사용자 타겟 지역의 3시간 뒤 날씨와 온도를 매핑하여 시간(예: `18:00`)과 함께 반환하도록 수정했습니다.
+* **프론트엔드**: [HomeTab.tsx](file:///Users/hani/Desktop/project/sales-route-map/frontend/src/presentation/features/home/HomeTab.tsx)에서 날씨 카드를 iOS 스타일의 정방형 세로 컴팩트 위젯 카드로 전면 개편하여 레이아웃을 최적화하고, 상단 인사말에 줄 바꿈을 적용해 가독성을 높였습니다.
+
+### 3. 서비스 워커(Service Worker) 오류 패치
+* **작업 내용**: [sw.js](file:///Users/hani/Desktop/project/sales-route-map/frontend/public/sw.js)의 `fetch` 이벤트 콜백 함수에서 누락되었던 `event` 인자 정의를 추가하여 `ReferenceError` 버그를 원천 해결했습니다.
+
+---
+
 ## 📅 2026-07-01 (수)
 
 ### 1. 패키지 매니저 Yarn 단일화

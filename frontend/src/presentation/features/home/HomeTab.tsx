@@ -27,7 +27,7 @@ export default function HomeTab({
   const [showCalendar, setShowCalendar] = useState(false);
 
   // Real-time weather state
-  const [weather, setWeather] = useState<{ temp: number; condition: string; region: string } | null>(null);
+  const [weather, setWeather] = useState<{ temp: number; condition: string; region: string; targetHour?: string } | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
 
   useEffect(() => {
@@ -43,7 +43,8 @@ export default function HomeTab({
         setWeather({
           temp: data.temp,
           condition: data.condition,
-          region: data.region
+          region: data.region,
+          targetHour: data.targetHour
         });
       } catch (err) {
         console.error("Failed to fetch weather:", err);
@@ -58,10 +59,9 @@ export default function HomeTab({
           fetchWeather(position.coords.latitude, position.coords.longitude);
         },
         (error) => {
-          console.warn("Geolocation failed or denied, fetching default weather:", error);
           fetchWeather();
         },
-        { timeout: 10000 }
+        { timeout: 5000, enableHighAccuracy: false, maximumAge: 300000 }
       );
     } else {
       fetchWeather();
@@ -218,100 +218,127 @@ export default function HomeTab({
       {/* Dynamic Greeting & Weather widget */}
       <section className="flex justify-between items-center gap-4">
         <div className="flex flex-col">
-          <h2 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight">
-            {nickname ? `${nickname}님 멋진 하루!` : "멋진 하루!"}
+          <h2 className="text-[21px] font-black text-slate-900 tracking-tight leading-tight">
+            {nickname ? (
+              <>
+                {nickname}님,
+                <br />
+                멋진 하루!
+              </>
+            ) : (
+              "멋진 하루!"
+            )}
           </h2>
-          <span className="text-[13px] text-slate-500 font-medium mt-1">
+          <span className="text-[13px] text-slate-500 font-medium mt-1.5">
             {currentDateStr}
           </span>
         </div>
 
         {/* Weather Card */}
-        <div className="flex items-center gap-2.5 bg-white/45 border border-white/20 backdrop-blur-md px-3.5 py-2.5 rounded-2xl shadow-sm shrink-0 min-w-[125px] justify-center">
+        <div className="flex flex-col items-center justify-center bg-white/55 border border-white/20 backdrop-blur-md p-3 rounded-2xl shadow-sm shrink-0 w-[105px] h-[95px] text-center border-slate-100/30">
           {isWeatherLoading ? (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-slate-200 border-t-primary"></div>
-              <span className="text-[11px] text-slate-400 font-semibold">정보 수신중...</span>
+            <div className="flex flex-col items-center justify-center gap-1.5">
+              <div className="animate-spin rounded-full h-4.5 w-4.5 border-2 border-slate-200 border-t-primary"></div>
+              <span className="text-[10px] text-slate-400 font-extrabold">조회 중...</span>
             </div>
           ) : weather ? (
             <>
-              {/* Weather Icon depending on condition */}
-              {(() => {
-                const cond = weather.condition;
-                if (cond === "맑음") {
-                  return (
-                    <div className="w-8.5 h-8.5 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500 shadow-sm shrink-0">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="4"></circle>
-                        <path d="M12 2v2"></path>
-                        <path d="M12 20v2"></path>
-                        <path d="M4.93 4.93l1.41 1.41"></path>
-                        <path d="M17.66 17.66l1.41 1.41"></path>
-                        <path d="M2 12h2"></path>
-                        <path d="M20 12h2"></path>
-                        <path d="M6.34 17.66l-1.41 1.41"></path>
-                        <path d="M19.07 4.93l-1.41 1.41"></path>
-                      </svg>
-                    </div>
-                  );
-                } else if (cond === "비" || cond === "이슬비" || cond === "소나기") {
-                  return (
-                    <div className="w-8.5 h-8.5 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500 shadow-sm shrink-0">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 18a5 5 0 0 0-10 0"></path>
-                        <path d="M12 2v1"></path>
-                        <path d="M8 14v4"></path>
-                        <path d="M12 14v4"></path>
-                        <path d="M16 14v4"></path>
-                      </svg>
-                    </div>
-                  );
-                } else if (cond === "눈") {
-                  return (
-                    <div className="w-8.5 h-8.5 bg-sky-50 rounded-xl flex items-center justify-center text-sky-400 shadow-sm shrink-0">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"></path>
-                        <line x1="8" y1="16" x2="8.01" y2="16"></line>
-                        <line x1="8" y1="20" x2="8.01" y2="20"></line>
-                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                        <line x1="12" y1="22" x2="12.01" y2="22"></line>
-                        <line x1="16" y1="16" x2="16.01" y2="16"></line>
-                        <line x1="16" y1="20" x2="16.01" y2="20"></line>
-                      </svg>
-                    </div>
-                  );
-                } else if (cond === "뇌우") {
-                  return (
-                    <div className="w-8.5 h-8.5 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 shadow-sm shrink-0">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 8.58"></path>
-                        <path d="M13 11l-2 3h3l-2 5"></path>
-                      </svg>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div className="w-8.5 h-8.5 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 shadow-sm shrink-0">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
-                      </svg>
-                    </div>
-                  );
-                }
-              })()}
-              <div className="flex flex-col text-right">
-                <span className="text-[13px] font-extrabold text-slate-900 leading-tight">
+              <div className="flex items-center gap-1.5 justify-center">
+                {/* Weather Icon depending on condition */}
+                {(() => {
+                  const cond = weather.condition;
+                  if (cond === "맑음") {
+                    return (
+                      <div className="w-7 h-7 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500 shadow-sm shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="4"></circle>
+                          <path d="M12 2v2"></path>
+                          <path d="M12 20v2"></path>
+                          <path d="M4.93 4.93l1.41 1.41"></path>
+                          <path d="M17.66 17.66l1.41 1.41"></path>
+                          <path d="M2 12h2"></path>
+                          <path d="M20 12h2"></path>
+                          <path d="M6.34 17.66l-1.41 1.41"></path>
+                          <path d="M19.07 4.93l-1.41 1.41"></path>
+                        </svg>
+                      </div>
+                    );
+                  } else if (cond === "비" || cond === "이슬비" || cond === "소나기") {
+                    return (
+                      <div className="w-7 h-7 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500 shadow-sm shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 18a5 5 0 0 0-10 0"></path>
+                          <path d="M12 2v1"></path>
+                          <path d="M8 14v4"></path>
+                          <path d="M12 14v4"></path>
+                          <path d="M16 14v4"></path>
+                        </svg>
+                      </div>
+                    );
+                  } else if (cond === "눈") {
+                    return (
+                      <div className="w-7 h-7 bg-sky-50 rounded-xl flex items-center justify-center text-sky-400 shadow-sm shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"></path>
+                          <line x1="8" y1="16" x2="8.01" y2="16"></line>
+                          <line x1="8" y1="20" x2="8.01" y2="20"></line>
+                          <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                          <line x1="12" y1="22" x2="12.01" y2="22"></line>
+                          <line x1="16" y1="16" x2="16.01" y2="16"></line>
+                          <line x1="16" y1="20" x2="16.01" y2="20"></line>
+                        </svg>
+                      </div>
+                    );
+                  } else if (cond === "뇌우") {
+                    return (
+                      <div className="w-7 h-7 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 shadow-sm shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 8.58"></path>
+                          <path d="M13 11l-2 3h3l-2 5"></path>
+                        </svg>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="w-7 h-7 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 shadow-sm shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                        </svg>
+                      </div>
+                    );
+                  }
+                })()}
+                <span className="text-[15px] font-black text-slate-900 leading-none">
                   {weather.temp}°C
                 </span>
-                <span className="text-[9px] text-slate-400 font-bold tracking-tight whitespace-nowrap mt-0.5">
-                  {weather.region} | {weather.condition}
-                </span>
               </div>
+              <span className="text-[9px] text-slate-500 font-bold tracking-tight truncate w-full mt-1.5">
+                {weather.region}
+              </span>
+              <span className="text-[9px] text-primary/80 font-black tracking-tight mt-0.5 truncate w-full">
+                {weather.targetHour ? `${weather.targetHour} 예보` : "3시간 뒤"} {weather.condition}
+              </span>
             </>
           ) : (
-            <div className="flex flex-col text-right">
-              <span className="text-[13px] font-extrabold text-slate-900 leading-tight">23°C</span>
-              <span className="text-[9px] text-slate-400 font-bold mt-0.5">서울 | 맑음</span>
+            <div className="flex flex-col items-center justify-center w-full">
+              <div className="flex items-center gap-1.5 justify-center">
+                <div className="w-7 h-7 bg-amber-50 rounded-xl flex items-center justify-center text-amber-500 shadow-sm shrink-0">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path d="M12 2v2"></path>
+                    <path d="M12 20v2"></path>
+                    <path d="M4.93 4.93l1.41 1.41"></path>
+                    <path d="M17.66 17.66l1.41 1.41"></path>
+                    <path d="M2 12h2"></path>
+                    <path d="M20 12h2"></path>
+                    <path d="M6.34 17.66l-1.41 1.41"></path>
+                    <path d="M19.07 4.93l-1.41 1.41"></path>
+                  </svg>
+                </div>
+                <span className="text-[15px] font-black text-slate-900 leading-none">23°C</span>
+              </div>
+              <span className="text-[9px] text-slate-550 font-bold tracking-tight truncate w-full mt-1.5">서울시</span>
+              <span className="text-[9px] text-primary/80 font-black tracking-tight mt-0.5 truncate w-full">3시간 뒤 맑음</span>
             </div>
           )}
         </div>
