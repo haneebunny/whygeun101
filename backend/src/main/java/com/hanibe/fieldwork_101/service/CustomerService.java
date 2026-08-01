@@ -16,6 +16,9 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -171,14 +174,52 @@ public class CustomerService {
     }
 
     private double[] getCoordinatesViaKakao(String address) {
-        if (address == null) {
+        if (address == null || address.trim().isEmpty()) {
             return new double[]{0.0, 0.0};
         }
-        String queryAddress = address.trim();
-        if (queryAddress.contains(",")) {
-            queryAddress = queryAddress.split(",")[0].trim();
+
+        // 1단계: 원본 주소 그대로 지오코딩 시도 (A)
+        String rawClean = address.replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
+        double[] coords = callKakaoApi(rawClean);
+        if (coords[0] != 0.0 && coords[1] != 0.0) {
+            return coords;
         }
-        String url = "https://dapi.kakao.com/v2/local/search/address.json?query=" + queryAddress;
+
+        // 2단계: 룰 기반 정제 후 지오코딩 시도 (B)
+        String refinedRuleAddress = refineAddressRuleBased(rawClean);
+        if (refinedRuleAddress != null && !refinedRuleAddress.isEmpty()) {
+            coords = callKakaoApi(refinedRuleAddress);
+            if (coords[0] != 0.0 && coords[1] != 0.0) {
+                return coords;
+            }
+        }
+
+        // 3단계: LLM 호출을 통한 지오코딩 시도 (C)
+        String preprocessed = preprocessAttachedNumbers(address);
+        try {
+            List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(preprocessed);
+            for (OpenAiService.RefinedCandidate lc : llmCandidates) {
+                coords = callKakaoApi(lc.refinedAddress);
+                if (coords[0] != 0.0 && coords[1] != 0.0) {
+                    return coords;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Fallback LLM geocoding failed: " + e.getMessage());
+        }
+
+        return new double[]{0.0, 0.0};
+    }
+
+    private double[] callKakaoApi(String queryAddress) {
+        if (queryAddress == null || queryAddress.trim().isEmpty()) {
+            return new double[]{0.0, 0.0};
+        }
+        String cleanQuery = queryAddress.trim();
+        if (cleanQuery.contains(",")) {
+            cleanQuery = cleanQuery.split(",")[0].trim();
+        }
+        String url = "https://dapi.kakao.com/v2/local/search/address.json?query=" + cleanQuery;
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "KakaoAK " + kakaoClientId);
         HttpEntity<?> entity = new HttpEntity<>(headers);
@@ -194,6 +235,101 @@ public class CustomerService {
         } catch (Exception e) {}
         return new double[]{0.0, 0.0};
     }
+
+    private String preprocessAttachedNumbers(String address) {
+        if (address == null) return "";
+        Pattern pattern = Pattern.compile("(\\d+)동");
+        Matcher matcher = pattern.matcher(address);
+        StringBuilder sb = new StringBuilder();
+        while (matcher.find()) {
+            String numStr = matcher.group(1);
+            if (numStr.length() >= 4) {
+                String replacement = numStr.substring(0, numStr.length() - 3) + " " + numStr.substring(numStr.length() - 3) + "동";
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+            } else {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private String refineAddressRuleBased(String address) {
+        String cleaned = address.replaceAll("\\(.*?\\)", "").trim();
+
+        // 1. (\d+)\s*동\s*(\d+)\s*호? 매칭
+        Pattern patternDongHo = Pattern.compile("(\\d+)\\s*동\\s*(\\d+)\\s*호?");
+        Matcher matcherDongHo = patternDongHo.matcher(cleaned);
+        if (matcherDongHo.find()) {
+            String dongStr = matcherDongHo.group(1);
+            int matchStart = matcherDongHo.start();
+            if (dongStr.length() >= 4) {
+                String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
+                return cleanRoadCandidate(cleaned.substring(0, matchStart).trim() + " " + roadPrefix);
+            } else {
+                return cleanRoadCandidate(cleaned.substring(0, matchStart).trim());
+            }
+        }
+
+        // 2. 단일 동/호 매칭
+        Pattern patternDong = Pattern.compile("(\\d+)\\s*동");
+        Pattern patternHo = Pattern.compile("(\\d+)\\s*호");
+        Matcher matcherDong = patternDong.matcher(cleaned);
+        Matcher matcherHo = patternHo.matcher(cleaned);
+
+        boolean hasDong = matcherDong.find();
+        boolean hasHo = matcherHo.find();
+
+        if (hasDong && hasHo) {
+            String dongStr = matcherDong.group(1);
+            int startIdx = Math.min(matcherDong.start(), matcherHo.start());
+            if (dongStr.length() >= 4) {
+                String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
+                return cleanRoadCandidate(cleaned.substring(0, startIdx).trim() + " " + roadPrefix);
+            } else {
+                return cleanRoadCandidate(cleaned.substring(0, startIdx).trim());
+            }
+        } else if (hasHo) {
+            return cleanRoadCandidate(cleaned.substring(0, matcherHo.start()).trim());
+        } else if (hasDong) {
+            String dongStr = matcherDong.group(1);
+            int startIdx = matcherDong.start();
+            if (dongStr.length() >= 4) {
+                String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
+                return cleanRoadCandidate(cleaned.substring(0, startIdx).trim() + " " + roadPrefix);
+            } else {
+                return cleanRoadCandidate(cleaned.substring(0, startIdx).trim());
+            }
+        }
+
+        // 3. 하이픈 패턴 (\b\d{1,4}-\d{3,4}\b)
+        Pattern patternHyphen = Pattern.compile("\\b(\\d{1,4})-(\\d{3,4})\\b");
+        Matcher matcherHyphen = patternHyphen.matcher(cleaned);
+        if (matcherHyphen.find()) {
+            return cleanRoadCandidate(cleaned.substring(0, matcherHyphen.start()).trim());
+        }
+
+        return cleanRoadCandidate(cleaned);
+    }
+
+    private String cleanRoadCandidate(String roadCandidate) {
+        String result = roadCandidate.replaceAll("\\s+", " ").trim();
+        
+        // 시 축약 보정
+        String[] tokens = result.split(" ");
+        if (tokens.length > 0) {
+            if ("서울".equals(tokens[0])) {
+                tokens[0] = "서울특별시";
+            } else if ("경기".equals(tokens[0])) {
+                tokens[0] = "경기도";
+            } else if ("인천".equals(tokens[0])) {
+                tokens[0] = "인천광역시";
+            }
+            result = String.join(" ", tokens);
+        }
+        return result;
+    }
+
 
     private final org.apache.poi.ss.usermodel.DataFormatter dataFormatter = new org.apache.poi.ss.usermodel.DataFormatter();
 
