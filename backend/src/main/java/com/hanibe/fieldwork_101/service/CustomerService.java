@@ -330,6 +330,60 @@ public class CustomerService {
         return result;
     }
 
+    private String mergeWithOriginalDetail(String originalAddress, String newAddress) {
+        if (originalAddress == null || newAddress == null) {
+            return newAddress;
+        }
+        
+        String cleanNew = newAddress.trim();
+        if (cleanNew.contains(",") || cleanNew.contains("동") || cleanNew.contains("호") || cleanNew.contains("층")) {
+            return cleanNew;
+        }
+
+        Pattern p1 = Pattern.compile("(\\d+)\\s*동\\s*(\\d+)\\s*호?");
+        Matcher m1 = p1.matcher(originalAddress);
+        if (m1.find()) {
+            return cleanNew + ", " + m1.group(0).trim();
+        }
+
+        Pattern p2 = Pattern.compile("\\b(\\d{1,4})-(\\d{3,4})\\b");
+        Matcher m2 = p2.matcher(originalAddress);
+        if (m2.find()) {
+            return cleanNew + ", " + m2.group(0).trim();
+        }
+
+        Pattern p3 = Pattern.compile("(\\d+)\\s*호");
+        Matcher m3 = p3.matcher(originalAddress);
+        if (m3.find()) {
+            return cleanNew + ", " + m3.group(0).trim();
+        }
+
+        Pattern p4 = Pattern.compile("(\\d+)동");
+        Matcher m4 = p4.matcher(originalAddress);
+        if (m4.find()) {
+            String dongStr = m4.group(1);
+            if (dongStr.length() >= 4) {
+                String restoredDong = dongStr.substring(dongStr.length() - 3) + "동";
+                Pattern pHo = Pattern.compile("동\\s*(\\d+)\\s*호?");
+                Matcher mHo = pHo.matcher(originalAddress);
+                if (mHo.find()) {
+                    return cleanNew + ", " + restoredDong + " " + mHo.group(1) + "호";
+                }
+                return cleanNew + ", " + restoredDong;
+            }
+        }
+
+        String originalRoad = refineAddressRuleBased(originalAddress);
+        String detailPart = originalAddress.replace(originalRoad, "").replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
+        if (!detailPart.isEmpty() && !detailPart.equals(originalAddress)) {
+            detailPart = detailPart.replaceAll("^[^a-zA-Z0-9가-힣]+", "").trim();
+            if (!detailPart.isEmpty()) {
+                return cleanNew + ", " + detailPart;
+            }
+        }
+
+        return cleanNew;
+    }
 
     private final org.apache.poi.ss.usermodel.DataFormatter dataFormatter = new org.apache.poi.ss.usermodel.DataFormatter();
 
@@ -428,10 +482,11 @@ public class CustomerService {
                 .filter(c -> c.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객 정보를 찾을 수 없습니다."));
 
-        String refinedAddress = newAddress.replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
+        String mergedAddress = mergeWithOriginalDetail(customer.getAddress(), newAddress);
+        String refinedAddress = mergedAddress.replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
         double[] coords = getCoordinatesViaKakao(refinedAddress);
 
-        customer.setAddress(newAddress);
+        customer.setAddress(mergedAddress);
         customer.setLatitude(coords[0] == 0.0 ? null : coords[0]);
         customer.setLongitude(coords[1] == 0.0 ? null : coords[1]);
         customerRepository.save(customer);
