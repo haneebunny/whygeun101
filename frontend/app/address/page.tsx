@@ -339,9 +339,17 @@ function AddressCorrectionContent() {
   // 상세 보정 모달 열기
   const openDetailModal = (corr: AddressCorrection) => {
     setSelectedCorrection(corr);
-    const defaultVal = corr.candidates && corr.candidates.length > 0 
+    let defaultVal = corr.candidates && corr.candidates.length > 0 
       ? corr.candidates[0].refined_address 
       : corr.original_address;
+      
+    // 상세주소 앞에 쉼표(,)를 자동으로 넣어주어 지오코딩 우회 및 동/호수 데이터 보존을 도움
+    if (defaultVal && !defaultVal.includes(",")) {
+      defaultVal = defaultVal.replace(/(\s+)(\d{1,4}-\d{3,4})\b/, ", $2");
+      defaultVal = defaultVal.replace(/(\s+)(\d+동)/, ", $2");
+      defaultVal = defaultVal.replace(/(\d+)(\d{3}동)/, "$1, $2");
+    }
+    
     setCustomAddress(defaultVal);
     setShowDetailModal(true);
   };
@@ -576,7 +584,7 @@ function AddressCorrectionContent() {
           <div className="bg-white/95 backdrop-blur-xl w-full max-w-sm p-6 rounded-3xl border border-slate-100 shadow-2xl flex flex-col gap-4 animate-scaleUp">
             <div>
               <h3 className="text-[15.5px] font-black text-slate-800">📍 상세 직접 보정</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">카카오 검색이 가능하도록 표준 주소(동/호수 제외)를 기입해 주세요.</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">도로명 주소와 상세주소(동/호수)는 쉼표(,) 뒤에 적어주시면 자동으로 보존됩니다.</p>
             </div>
 
             <div className="space-y-3">
