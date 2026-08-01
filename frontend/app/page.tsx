@@ -67,6 +67,7 @@ function PageContent() {
         if (data.type === "NATIVE_GPS_RESPONSE") {
           const { latitude, longitude } = data.payload;
           console.log("GPS received from native device:", latitude, longitude);
+          window.dispatchEvent(new CustomEvent("nativeGps", { detail: data.payload }));
         }
       } catch (e) {
         console.error("Error handling native message:", e);

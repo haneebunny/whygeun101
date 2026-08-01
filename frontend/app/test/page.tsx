@@ -32,12 +32,12 @@ export default function AppBridgeTest() {
     };
 
     // 안드로이드/iOS 웹뷰 브릿지 이벤트 등록
-    window.addEventListener("message", handleMessage);
-    document.addEventListener("message", handleMessage); // 안드로이드 하위버전 대응
+    window.addEventListener("message", handleMessage as any);
+    document.addEventListener("message", handleMessage as any); // 안드로이드 하위버전 대응
 
     return () => {
-      window.removeEventListener("message", handleMessage);
-      document.removeEventListener("message", handleMessage);
+      window.removeEventListener("message", handleMessage as any);
+      document.removeEventListener("message", handleMessage as any);
     };
   }, []);
 
