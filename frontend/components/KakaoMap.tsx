@@ -229,7 +229,7 @@ export default function KakaoMap({
       const bounds = new window.kakao.maps.LatLngBounds();
       const grouped: { [key: string]: Customer[] } = {};
       validCustomers.forEach((c) => {
-        const key = `${c.latitude.toFixed(5)}_${c.longitude.toFixed(5)}`;
+        const key = `${c.latitude!.toFixed(5)}_${c.longitude!.toFixed(5)}`;
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push(c);
       });
