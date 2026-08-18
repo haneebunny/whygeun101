@@ -232,6 +232,16 @@ public class CustomerService {
                 double lng = Double.parseDouble(docs.get(0).get("x").toString());
                 return new double[]{lat, lng};
             }
+
+            // 💡 [폴백] 주소 API 결과가 없을 경우 카카오 로컬 키워드 API로 2차 시도 (유명 아파트명/건물명 대응)
+            String keywordUrl = "https://dapi.kakao.com/v2/local/search/keyword.json?query=" + cleanQuery;
+            ResponseEntity<Map> kwResponse = restTemplate.exchange(keywordUrl, HttpMethod.GET, entity, Map.class);
+            List<Map<String, Object>> kwDocs = (List<Map<String, Object>>) kwResponse.getBody().get("documents");
+            if (kwDocs != null && !kwDocs.isEmpty()) {
+                double lat = Double.parseDouble(kwDocs.get(0).get("y").toString());
+                double lng = Double.parseDouble(kwDocs.get(0).get("x").toString());
+                return new double[]{lat, lng};
+            }
         } catch (Exception e) {}
         return new double[]{0.0, 0.0};
     }
@@ -257,13 +267,33 @@ public class CustomerService {
     private String refineAddressRuleBased(String address) {
         String cleaned = address.replaceAll("\\(.*?\\)", "").trim();
 
-        // 1. (\d+)\s*동\s*(\d+)\s*호? 매칭
-        Pattern patternDongHo = Pattern.compile("(\\d+)\\s*동\\s*(\\d+)\\s*호?");
+        // 💡 [패턴 A] 하이픈 앞 숫자가 5자리 이상 (예: 70701-1415 ➡️ 건물번호 70)
+        // 70701을 70(건물번호)과 701(동)로 간주하여 70으로 복원
+        Pattern patternConcatDong = Pattern.compile("\\b(\\d{1,3})(\\d{3})-(\\d{3,4})\\b");
+        Matcher matcherConcatDong = patternConcatDong.matcher(cleaned);
+        if (matcherConcatDong.find()) {
+            String bldNum = matcherConcatDong.group(1);
+            return cleanRoadCandidate(cleaned.substring(0, matcherConcatDong.start()).trim() + " " + bldNum);
+        }
+
+        // 💡 [패턴 B] 하이픈 뒤 숫자가 5자리 이상 (예: 20-18202호 ➡️ 건물번호 20-18)
+        // 18202를 18(부번)과 202(호)로 간주하여 20-18로 복원
+        Pattern patternConcatHo = Pattern.compile("\\b(\\d+)-(\\d{1,3})(\\d{3})호?\\b");
+        Matcher matcherConcatHo = patternConcatHo.matcher(cleaned);
+        if (matcherConcatHo.find()) {
+            String mainBld = matcherConcatHo.group(1);
+            String subBld = matcherConcatHo.group(2);
+            return cleanRoadCandidate(cleaned.substring(0, matcherConcatHo.start()).trim() + " " + mainBld + "-" + subBld);
+        }
+
+        // 1. ([0-9a-zA-Z가-힣])\s*동\s*(\d+)\s*호? 매칭 (가동, 나동, 101동 대응)
+        Pattern patternDongHo = Pattern.compile("([0-9a-zA-Z가-힣]{1,3})\\s*동\\s*(\\d+)\\s*호?");
         Matcher matcherDongHo = patternDongHo.matcher(cleaned);
         if (matcherDongHo.find()) {
             String dongStr = matcherDongHo.group(1);
             int matchStart = matcherDongHo.start();
-            if (dongStr.length() >= 4) {
+            // 동 번호가 숫자로만 이루어지고 4자리 이상인 경우만 기존 로직 적용
+            if (dongStr.matches("\\d+") && dongStr.length() >= 4) {
                 String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
                 return cleanRoadCandidate(cleaned.substring(0, matchStart).trim() + " " + roadPrefix);
             } else {
@@ -272,7 +302,7 @@ public class CustomerService {
         }
 
         // 2. 단일 동/호 매칭
-        Pattern patternDong = Pattern.compile("(\\d+)\\s*동");
+        Pattern patternDong = Pattern.compile("([0-9a-zA-Z가-힣]{1,3})\\s*동");
         Pattern patternHo = Pattern.compile("(\\d+)\\s*호");
         Matcher matcherDong = patternDong.matcher(cleaned);
         Matcher matcherHo = patternHo.matcher(cleaned);
@@ -283,7 +313,7 @@ public class CustomerService {
         if (hasDong && hasHo) {
             String dongStr = matcherDong.group(1);
             int startIdx = Math.min(matcherDong.start(), matcherHo.start());
-            if (dongStr.length() >= 4) {
+            if (dongStr.matches("\\d+") && dongStr.length() >= 4) {
                 String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
                 return cleanRoadCandidate(cleaned.substring(0, startIdx).trim() + " " + roadPrefix);
             } else {
@@ -294,7 +324,7 @@ public class CustomerService {
         } else if (hasDong) {
             String dongStr = matcherDong.group(1);
             int startIdx = matcherDong.start();
-            if (dongStr.length() >= 4) {
+            if (dongStr.matches("\\d+") && dongStr.length() >= 4) {
                 String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
                 return cleanRoadCandidate(cleaned.substring(0, startIdx).trim() + " " + roadPrefix);
             } else {
