@@ -111,6 +111,9 @@ export default function KakaoMap({
     };
 
     (window as any).openMapPopup = (groupId: string) => {
+      if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
       if (!mapRef.current) return;
       Object.values(markerMapRef.current).forEach(({ popup }) =>
         popup.setMap(null),
@@ -195,6 +198,14 @@ export default function KakaoMap({
           center: defaultCenter,
           level: isFullScreen ? 7 : 6,
         });
+
+        const handleMapInteraction = () => {
+          if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        };
+        window.kakao.maps.event.addListener(mapRef.current, "click", handleMapInteraction);
+        window.kakao.maps.event.addListener(mapRef.current, "dragstart", handleMapInteraction);
 
         // Add idle event listener once when map is initialized
         if (onVisibleCustomersChange) {

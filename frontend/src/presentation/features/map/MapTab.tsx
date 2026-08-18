@@ -125,7 +125,7 @@ export default function MapTab({
   };
 
   return (
-    <div className="w-full h-[calc(100vh-140px)] relative flex flex-col bg-transparent">
+    <div className="w-full h-[calc(100vh-80px)] relative flex flex-col bg-transparent">
       {/* Search and Filters Header */}
       <div className="w-full glass-header p-4 flex flex-col gap-3 z-10 shadow-sm">
         <div className="flex items-center gap-2 bg-white/40 border border-white/20 backdrop-blur-md rounded-xl px-3 py-2.5 shadow-inner">
@@ -176,7 +176,12 @@ export default function MapTab({
             return (
               <button
                 key={status}
-                onClick={() => setStatusFilter(status)}
+                onClick={() => {
+                  if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                  }
+                  setStatusFilter(status);
+                }}
                 className={`px-4 py-1.5 rounded-full text-[12.5px] transition-all whitespace-nowrap cursor-pointer ${
                   isSelected ? activeStyle : defaultStyle
                 }`}

@@ -6,11 +6,23 @@ interface HeaderProps {
   isLoggedIn?: boolean;
   nickname?: string;
   onLoginClick?: () => void;
+  isHidden?: boolean;
 }
 
-export default function Header({ isLoggedIn = false, nickname = "", onLoginClick }: HeaderProps) {
+export default function Header({
+  isLoggedIn = false,
+  nickname = "",
+  onLoginClick,
+  isHidden = false,
+}: HeaderProps) {
   return (
-    <header className="flex justify-between items-center px-5 py-3 glass-header sticky top-0 z-50">
+    <header
+      className={`flex justify-between items-center px-5 glass-header sticky top-0 z-50 transition-all duration-300 transform overflow-hidden ${
+        isHidden
+          ? "-translate-y-full opacity-0 max-h-0 py-0 border-b-0 pointer-events-none"
+          : "translate-y-0 opacity-100 max-h-20 py-3"
+      }`}
+    >
       <div className="flex items-center gap-2.5 text-primary">
         <img src="/icon.png" alt="logo" className="w-5.5 h-5.5 object-contain" />
         <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
