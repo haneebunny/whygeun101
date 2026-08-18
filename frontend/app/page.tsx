@@ -55,8 +55,31 @@ function PageContent() {
     setIsLoading(false);
   }, []);
 
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const lastScrollYRef = React.useRef(0);
+
   useEffect(() => {
     trackEvent("Tab View", { tab: activeTab });
+
+    if (activeTab === "map") {
+      setIsHeaderHidden(true);
+      return;
+    }
+
+    setIsHeaderHidden(false);
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > 40 && currentScrollY > lastScrollYRef.current) {
+        setIsHeaderHidden(true);
+      } else {
+        setIsHeaderHidden(false);
+      }
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [activeTab]);
 
   // Webview communications receiver
@@ -568,6 +591,7 @@ function PageContent() {
         isLoggedIn={isLoggedIn}
         nickname={nickname}
         onLoginClick={() => setShowLoginView(true)}
+        isHidden={isHeaderHidden}
       />
 
       <main className="flex-1 w-full bg-transparent">
