@@ -34,4 +34,4 @@ kakao:
 
 openai:
   api-key: ${OPENAI_API_KEY:}
-  model: ${LLM_MODEL:gpt-5.4-mini}
+  model: ${LLM_MODEL:gpt-4o-mini}
