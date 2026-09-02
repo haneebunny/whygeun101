@@ -8,13 +8,14 @@ import { authRepository } from "../../../data/repositories/authApi";
 interface SettingsTabProps {
   nickname: string;
   onLogout: () => void;
+  onDeleteAccount: () => void;
   backendIp: string;
 }
 
 export default function SettingsTab({
   nickname,
   onLogout,
-  backendIp,
+  onDeleteAccount,
 }: SettingsTabProps) {
   const { statusLabels, updateStatusLabel } = useStatus();
   const { showAlert } = useAlert();
@@ -271,14 +272,22 @@ export default function SettingsTab({
         </div>
       </section>
 
-      {/* Logout Button */}
+      {/* Logout & Account Deletion */}
       {nickname && (
-        <button
-          onClick={onLogout}
-          className="w-full py-4 bg-white/40 hover:bg-rose-500/10 border border-white/20 text-slate-600 hover:text-rose-500 font-extrabold text-[13.5px] rounded-2xl backdrop-blur-md transition shadow-sm cursor-pointer mt-1"
-        >
-          🚪 로그아웃
-        </button>
+        <div className="flex flex-col items-center gap-3 mt-1">
+          <button
+            onClick={onLogout}
+            className="w-full py-4 bg-white/40 hover:bg-rose-500/10 border border-white/20 text-slate-600 hover:text-rose-500 font-extrabold text-[13.5px] rounded-2xl backdrop-blur-md transition shadow-sm cursor-pointer"
+          >
+            🚪 로그아웃
+          </button>
+          <button
+            onClick={onDeleteAccount}
+            className="text-[11.5px] font-bold text-slate-400 hover:text-rose-500 underline underline-offset-4 transition cursor-pointer py-1"
+          >
+            회원 탈퇴 (계정 및 데이터 삭제)
+          </button>
+        </div>
       )}
     </div>
   );
