@@ -151,8 +151,7 @@ public class CustomerService {
                 }
             }
             if (!foundInDb) {
-                String refinedAddress = data.getAddress().replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
-                double[] coords = getCoordinatesViaKakao(refinedAddress);
+                double[] coords = getCoordinatesViaKakao(data.getAddress());
 
                 Customer customer = Customer.builder()
                         .name(data.getName())
@@ -176,6 +175,16 @@ public class CustomerService {
     private double[] getCoordinatesViaKakao(String address) {
         if (address == null || address.trim().isEmpty()) {
             return new double[]{0.0, 0.0};
+        }
+
+        // 0단계: 아파트/단지명 우선 키워드 지오코딩 시도
+        String bldName = extractBuildingName(address);
+        String regionPrefix = extractRegionPrefix(address);
+        if (!bldName.isEmpty() && !regionPrefix.isEmpty()) {
+            double[] coords = callKakaoKeywordApi(regionPrefix + " " + bldName);
+            if (coords[0] != 0.0 && coords[1] != 0.0) {
+                return coords;
+            }
         }
 
         // 1단계: 원본 주소 그대로 지오코딩 시도 (A)
@@ -219,6 +228,12 @@ public class CustomerService {
         if (cleanQuery.contains(",")) {
             cleanQuery = cleanQuery.split(",")[0].trim();
         }
+
+        // 단순 광역자치단체명 단독 질의 시 좌표 반환 차단 (서울시청 핀 방지)
+        if (cleanQuery.matches("^(서울특별시|서울시|서울|경기도|경기|인천광역시|인천|강원도|강원|충청북도|충북|충청남도|충남|전라북도|전북|전라남도|전남|경상북도|경북|경상남도|경남|제주특별자치도|제주도|제주|부산광역시|부산|대구광역시|대구|대전광역시|대전|광주광역시|광주|울산광역시|울산|세종특별자치시|세종)$")) {
+            return new double[]{0.0, 0.0};
+        }
+
         String url = "https://dapi.kakao.com/v2/local/search/address.json?query=" + cleanQuery;
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "KakaoAK " + kakaoClientId);
@@ -228,22 +243,177 @@ public class CustomerService {
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
             List<Map<String, Object>> docs = (List<Map<String, Object>>) response.getBody().get("documents");
             if (docs != null && !docs.isEmpty()) {
-                double lat = Double.parseDouble(docs.get(0).get("y").toString());
-                double lng = Double.parseDouble(docs.get(0).get("x").toString());
-                return new double[]{lat, lng};
+                String addressType = (String) docs.get(0).get("address_type");
+                // REGION(단순 행정구역 중심점)은 개별 고객 건물의 실제 위치가 아니므로 무효 처리
+                if (!"REGION".equalsIgnoreCase(addressType)) {
+                    double lat = Double.parseDouble(docs.get(0).get("y").toString());
+                    double lng = Double.parseDouble(docs.get(0).get("x").toString());
+                    return new double[]{lat, lng};
+                }
             }
 
             // 💡 [폴백] 주소 API 결과가 없을 경우 카카오 로컬 키워드 API로 2차 시도 (유명 아파트명/건물명 대응)
-            String keywordUrl = "https://dapi.kakao.com/v2/local/search/keyword.json?query=" + cleanQuery;
+            return callKakaoKeywordApi(cleanQuery);
+        } catch (Exception e) {}
+        return new double[]{0.0, 0.0};
+    }
+
+    private double[] callKakaoKeywordApi(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return new double[]{0.0, 0.0};
+        }
+        String cleanQuery = query.trim();
+        String keywordUrl = "https://dapi.kakao.com/v2/local/search/keyword.json?query=" + cleanQuery;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "KakaoAK " + kakaoClientId);
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+
+        try {
             ResponseEntity<Map> kwResponse = restTemplate.exchange(keywordUrl, HttpMethod.GET, entity, Map.class);
             List<Map<String, Object>> kwDocs = (List<Map<String, Object>>) kwResponse.getBody().get("documents");
             if (kwDocs != null && !kwDocs.isEmpty()) {
+                String pname = (String) kwDocs.get(0).get("place_name");
+                if (pname != null && (pname.contains("시청") || pname.contains("구청")) && !cleanQuery.contains("시청") && !cleanQuery.contains("구청")) {
+                    return new double[]{0.0, 0.0};
+                }
                 double lat = Double.parseDouble(kwDocs.get(0).get("y").toString());
                 double lng = Double.parseDouble(kwDocs.get(0).get("x").toString());
                 return new double[]{lat, lng};
             }
         } catch (Exception e) {}
         return new double[]{0.0, 0.0};
+    }
+
+    private String extractRegionPrefix(String address) {
+        if (address == null) return "서울 강동구";
+        Pattern pattern = Pattern.compile("^(서울(?:특별시)?\\s+[가-힣]+구|[가-힣]+(?:도|시|군|구)\\s+[가-힣]+(?:시|군|구))");
+        Matcher matcher = pattern.matcher(address.trim());
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "서울 강동구";
+    }
+
+    private String extractBuildingName(String address) {
+        if (address == null || address.trim().isEmpty()) return "";
+
+        // 1. 괄호 안 확인 (예: (고덕동, 고덕그라시움아파트), (암사동, 강동 롯데캐슬퍼스트아파트), (명일동, 래미안 솔베뉴))
+        Matcher matcherParen = Pattern.compile("\\((.*?)\\)").matcher(address);
+        while (matcherParen.find()) {
+            String content = matcherParen.group(1).trim();
+            String[] parts = content.split(",");
+            for (String p : parts) {
+                String item = p.trim();
+                // 단순 법정동명 (예: 고덕동, 암사동) 제외
+                if (item.matches("^[가-힣]{1,4}(동|읍|면|리)$")) {
+                    continue;
+                }
+                String cleanItem = item.replaceAll("^[가-힣]{1,4}(동|읍|면|리)\\s+", "").trim();
+                if (!cleanItem.isEmpty()) {
+                    return cleanItem;
+                } else if (item.length() >= 2 && !item.matches("\\d+")) {
+                    return item;
+                }
+            }
+        }
+
+        // 2. 쉼표 뒤 확인 (예: 강일동, 강동리버스트6단지 / 길동, 베네시티)
+        Matcher matcherComma = Pattern.compile(",\\s*([가-힣0-9a-zA-Z\\s]+)$").matcher(address);
+        if (matcherComma.find()) {
+            String cand = matcherComma.group(1).trim();
+            if (!cand.matches("^[가-힣]{1,4}(동|읍|면|리)$")) {
+                return cand;
+            }
+        }
+
+        // 3. 법정동 뒤에 붙은 아파트명 (예: 명일동, 한양아파트 / 길동160번지 헤리티지자이)
+        Matcher matcherTail = Pattern.compile("([가-힣]{1,4}(동|리))[\\s,]+([가-힣0-9a-zA-Z\\s]+?(아파트|단지|빌라|맨션|오피스텔|타운|자이|힐스테이트|아이파크|캐슬|푸르지오|더샵|파밀리에|수자인|베네시티|하우스|하이츠|노블하임|빌|팰리스|마을))").matcher(address);
+        if (matcherTail.find()) {
+            return matcherTail.group(3).trim();
+        }
+
+        // 4. 일반 아파트/단지/빌라 키워드 매칭
+        Matcher matcherGen = Pattern.compile("([가-힣0-9a-zA-Z]{2,15}(?:아파트|단지|빌라|맨션|오피스텔|타운|자이|힐스테이트|아이파크|롯데캐슬|푸르지오|더샵|파밀리에|수자인|베네시티|노블하임))").matcher(address);
+        if (matcherGen.find()) {
+            String cand = matcherGen.group(1).trim();
+            if (!cand.matches(".*(특별시|광역시|특별자치시|구|로|길)$")) {
+                return cand;
+            }
+        }
+
+        return "";
+    }
+
+    private String extractDongHo(String address) {
+        if (address == null || address.trim().isEmpty()) return "";
+
+        // 1. 101동 1001호 / 101동1001호
+        Matcher m1 = Pattern.compile("(\\d{1,4}\\s*동)\\s*(\\d{1,4}\\s*호)").matcher(address);
+        if (m1.find()) {
+            return m1.group(1).replace(" ", "") + " " + m1.group(2).replace(" ", "");
+        }
+
+        // 2. 붙어있는 동호수 (예: 603동1007호 / 77603동1007호 -> 603동 1007호)
+        Matcher m2 = Pattern.compile("(\\d{3,6})동\\s*(\\d{1,4})호?").matcher(address);
+        if (m2.find()) {
+            String d = m2.group(1);
+            if (d.length() >= 4) {
+                d = d.substring(d.length() - 3);
+            }
+            String h = m2.group(2);
+            if (!h.endsWith("호")) h += "호";
+            return d + "동 " + h;
+        }
+
+        // 3. 하이픈 동-호수 (예: 204-1702, 106-402)
+        Matcher m3 = Pattern.compile("\\b(\\d{1,4})-(\\d{3,4})\\b").matcher(address);
+        if (m3.find()) {
+            return m3.group(1) + "동 " + m3.group(2) + "호";
+        }
+
+        // 4. 층수 + 호수 (예: 1층 102호)
+        Matcher m4 = Pattern.compile("(\\d+층)\\s*(\\d+호)").matcher(address);
+        if (m4.find()) {
+            return m4.group(1) + " " + m4.group(2);
+        }
+
+        // 5. 가동/나동/A동/B동 + 호수
+        Matcher m5 = Pattern.compile("([가-힣A-Za-z]\\s*동)\\s*(\\d+호)").matcher(address);
+        if (m5.find()) {
+            return m5.group(1).replace(" ", "") + " " + m5.group(2);
+        }
+
+        // 6. 호수 매칭 (예: 18602호 -> 602호, 189908호 -> 908호, 402호 -> 402호)
+        Matcher m6 = Pattern.compile("(\\d{1,6})\\s*호").matcher(address);
+        if (m6.find()) {
+            String hoStr = m6.group(1);
+            if (hoStr.length() >= 5) {
+                return hoStr.substring(hoStr.length() - 3) + "호";
+            }
+            return hoStr + "호";
+        }
+
+        // 7. 층수만 있는 경우 (예: 65층 -> 5층)
+        Matcher m7 = Pattern.compile("(\\d+)층").matcher(address);
+        if (m7.find()) {
+            String floor = m7.group(1);
+            if (floor.length() > 1) {
+                floor = floor.substring(floor.length() - 1);
+            }
+            return floor + "층";
+        }
+
+        // 8. 동만 있는 경우 (예: 101동)
+        Matcher m8 = Pattern.compile("(\\d{1,6})동").matcher(address);
+        if (m8.find()) {
+            String d = m8.group(1);
+            if (d.length() >= 4) {
+                d = d.substring(d.length() - 3);
+            }
+            return d + "동";
+        }
+
+        return "";
     }
 
     private String preprocessAttachedNumbers(String address) {
@@ -267,32 +437,12 @@ public class CustomerService {
     private String refineAddressRuleBased(String address) {
         String cleaned = address.replaceAll("\\(.*?\\)", "").trim();
 
-        // 💡 [패턴 A] 하이픈 앞 숫자가 5자리 이상 (예: 70701-1415 ➡️ 건물번호 70)
-        // 70701을 70(건물번호)과 701(동)로 간주하여 70으로 복원
-        Pattern patternConcatDong = Pattern.compile("\\b(\\d{1,3})(\\d{3})-(\\d{3,4})\\b");
-        Matcher matcherConcatDong = patternConcatDong.matcher(cleaned);
-        if (matcherConcatDong.find()) {
-            String bldNum = matcherConcatDong.group(1);
-            return cleanRoadCandidate(cleaned.substring(0, matcherConcatDong.start()).trim() + " " + bldNum);
-        }
-
-        // 💡 [패턴 B] 하이픈 뒤 숫자가 5자리 이상 (예: 20-18202호 ➡️ 건물번호 20-18)
-        // 18202를 18(부번)과 202(호)로 간주하여 20-18로 복원
-        Pattern patternConcatHo = Pattern.compile("\\b(\\d+)-(\\d{1,3})(\\d{3})호?\\b");
-        Matcher matcherConcatHo = patternConcatHo.matcher(cleaned);
-        if (matcherConcatHo.find()) {
-            String mainBld = matcherConcatHo.group(1);
-            String subBld = matcherConcatHo.group(2);
-            return cleanRoadCandidate(cleaned.substring(0, matcherConcatHo.start()).trim() + " " + mainBld + "-" + subBld);
-        }
-
-        // 1. ([0-9a-zA-Z가-힣])\s*동\s*(\d+)\s*호? 매칭 (가동, 나동, 101동 대응)
-        Pattern patternDongHo = Pattern.compile("([0-9a-zA-Z가-힣]{1,3})\\s*동\\s*(\\d+)\\s*호?");
+        // 1. 아파트 동+호수 매칭 (예: 130105동 2102호 ➡️ 건물번호 130 복원)
+        Pattern patternDongHo = Pattern.compile("(\\d+|[A-Za-z]|가|나|다|라)\\s*동(?!구)\\s*(\\d+)\\s*호?");
         Matcher matcherDongHo = patternDongHo.matcher(cleaned);
         if (matcherDongHo.find()) {
             String dongStr = matcherDongHo.group(1);
             int matchStart = matcherDongHo.start();
-            // 동 번호가 숫자로만 이루어지고 4자리 이상인 경우만 기존 로직 적용
             if (dongStr.matches("\\d+") && dongStr.length() >= 4) {
                 String roadPrefix = dongStr.substring(0, dongStr.length() - 3);
                 return cleanRoadCandidate(cleaned.substring(0, matchStart).trim() + " " + roadPrefix);
@@ -301,8 +451,49 @@ public class CustomerService {
             }
         }
 
-        // 2. 단일 동/호 매칭
-        Pattern patternDong = Pattern.compile("([0-9a-zA-Z가-힣]{1,3})\\s*동");
+        // 💡 [패턴 A] 하이픈 앞 숫자가 5자리 이상 (예: 70701-1415 ➡️ 건물번호 70)
+        Pattern patternConcatDong = Pattern.compile("\\b(\\d{1,3})(\\d{3})-(\\d{3,4})\\b");
+        Matcher matcherConcatDong = patternConcatDong.matcher(cleaned);
+        if (matcherConcatDong.find()) {
+            String bldNum = matcherConcatDong.group(1);
+            return cleanRoadCandidate(cleaned.substring(0, matcherConcatDong.start()).trim() + " " + bldNum);
+        }
+
+        // 💡 [패턴 B] 하이픈 뒤 숫자가 5자리 이상 (예: 20-18202호 ➡️ 건물번호 20-18)
+        Pattern patternConcatHo = Pattern.compile("\\b(\\d+)-(\\d{1,3})(\\d{3})호?\\b");
+        Matcher matcherConcatHo = patternConcatHo.matcher(cleaned);
+        if (matcherConcatHo.find()) {
+            String mainBld = matcherConcatHo.group(1);
+            String subBld = matcherConcatHo.group(2);
+            return cleanRoadCandidate(cleaned.substring(0, matcherConcatHo.start()).trim() + " " + mainBld + "-" + subBld);
+        }
+
+        // 💡 [패턴 C] 건물번호 + 3자리 호수 (예: 18602호 ➡️ 건물번호 18, 602호)
+        Pattern patternConcatBldHo = Pattern.compile("(\\d{1,4})(\\d{3})호");
+        Matcher matcherConcatBldHo = patternConcatBldHo.matcher(cleaned);
+        if (matcherConcatBldHo.find()) {
+            String bldNum = matcherConcatBldHo.group(1);
+            return cleanRoadCandidate(cleaned.substring(0, matcherConcatBldHo.start()).trim() + " " + bldNum);
+        }
+
+        // 💡 [패턴 D] 건물번호 + 층수 (예: 65층암사동 ➡️ 건물번호 6, 5층 / 2091층성내동 ➡️ 건물번호 209, 1층)
+        Pattern patternConcatBldFloor = Pattern.compile("(\\d+?)(\\d)층");
+        Matcher matcherConcatBldFloor = patternConcatBldFloor.matcher(cleaned);
+        if (matcherConcatBldFloor.find()) {
+            String bldNum = matcherConcatBldFloor.group(1);
+            return cleanRoadCandidate(cleaned.substring(0, matcherConcatBldFloor.start()).trim() + " " + bldNum);
+        }
+
+        // 💡 [패턴 E] 건물번호 뒤 하이픈 동-호수 (예: 양재대로 1650 106-402 ➡️ 건물번호 1650)
+        Pattern patternBldHyphen = Pattern.compile("\\b(\\d{1,4})\\s+(\\d{1,4}-\\d{1,4})\\b");
+        Matcher matcherBldHyphen = patternBldHyphen.matcher(cleaned);
+        if (matcherBldHyphen.find()) {
+            String bldNum = matcherBldHyphen.group(1);
+            return cleanRoadCandidate(cleaned.substring(0, matcherBldHyphen.start()).trim() + " " + bldNum);
+        }
+
+        // 2. 단일 동/호 매칭 (강동구, 성동구 등 행정구 오인 방지: 동(?!구) 및 숫자/단일문자 동만 허용)
+        Pattern patternDong = Pattern.compile("(\\d+|[A-Za-z]|가|나|다|라)\\s*동(?!구)");
         Pattern patternHo = Pattern.compile("(\\d+)\\s*호");
         Matcher matcherDong = patternDong.matcher(cleaned);
         Matcher matcherHo = patternHo.matcher(cleaned);
@@ -361,58 +552,48 @@ public class CustomerService {
     }
 
     private String mergeWithOriginalDetail(String originalAddress, String newAddress) {
-        if (originalAddress == null || newAddress == null) {
+        if (originalAddress == null || originalAddress.trim().isEmpty()) {
+            return newAddress != null ? newAddress : "";
+        }
+        if (newAddress == null || newAddress.trim().isEmpty()) {
+            return originalAddress;
+        }
+
+        String cleanRoad = newAddress.split(",")[0].trim();
+        String detailExisting = newAddress.contains(",") ? newAddress.substring(newAddress.indexOf(",") + 1).trim() : "";
+
+        // 이미 상세주소(동/호/층)가 newAddress에 포함되어 있다면 그대로 반환
+        Pattern detailPattern = Pattern.compile("(\\d+동|\\d+호|\\d+층|\\d+-\\d+)");
+        if (detailPattern.matcher(detailExisting).find()) {
             return newAddress;
         }
-        
-        String cleanNew = newAddress.trim();
-        if (cleanNew.contains(",") || cleanNew.contains("동") || cleanNew.contains("호") || cleanNew.contains("층")) {
-            return cleanNew;
+
+        String bldName = extractBuildingName(originalAddress);
+        String dongHo = extractDongHo(originalAddress);
+
+        List<String> detailList = new ArrayList<>();
+        if (bldName != null && !bldName.isEmpty() && !cleanRoad.contains(bldName)) {
+            detailList.add(bldName);
+        }
+        if (dongHo != null && !dongHo.isEmpty()) {
+            detailList.add(dongHo);
         }
 
-        Pattern p1 = Pattern.compile("(\\d+)\\s*동\\s*(\\d+)\\s*호?");
-        Matcher m1 = p1.matcher(originalAddress);
-        if (m1.find()) {
-            return cleanNew + ", " + m1.group(0).trim();
+        if (!detailList.isEmpty()) {
+            return cleanRoad + ", " + String.join(" ", detailList);
         }
 
-        Pattern p2 = Pattern.compile("\\b(\\d{1,4})-(\\d{3,4})\\b");
-        Matcher m2 = p2.matcher(originalAddress);
-        if (m2.find()) {
-            return cleanNew + ", " + m2.group(0).trim();
-        }
-
-        Pattern p3 = Pattern.compile("(\\d+)\\s*호");
-        Matcher m3 = p3.matcher(originalAddress);
-        if (m3.find()) {
-            return cleanNew + ", " + m3.group(0).trim();
-        }
-
-        Pattern p4 = Pattern.compile("(\\d+)동");
-        Matcher m4 = p4.matcher(originalAddress);
-        if (m4.find()) {
-            String dongStr = m4.group(1);
-            if (dongStr.length() >= 4) {
-                String restoredDong = dongStr.substring(dongStr.length() - 3) + "동";
-                Pattern pHo = Pattern.compile("동\\s*(\\d+)\\s*호?");
-                Matcher mHo = pHo.matcher(originalAddress);
-                if (mHo.find()) {
-                    return cleanNew + ", " + restoredDong + " " + mHo.group(1) + "호";
-                }
-                return cleanNew + ", " + restoredDong;
-            }
-        }
-
+        // 동호수나 아파트명이 추출되지 않은 경우 원본 상세주소 부분 보존 시도
         String originalRoad = refineAddressRuleBased(originalAddress);
         String detailPart = originalAddress.replace(originalRoad, "").replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
         if (!detailPart.isEmpty() && !detailPart.equals(originalAddress)) {
             detailPart = detailPart.replaceAll("^[^a-zA-Z0-9가-힣]+", "").trim();
-            if (!detailPart.isEmpty()) {
-                return cleanNew + ", " + detailPart;
+            if (!detailPart.isEmpty() && !cleanRoad.contains(detailPart)) {
+                return cleanRoad + ", " + detailPart;
             }
         }
 
-        return cleanNew;
+        return cleanRoad;
     }
 
     private final org.apache.poi.ss.usermodel.DataFormatter dataFormatter = new org.apache.poi.ss.usermodel.DataFormatter();
@@ -513,8 +694,7 @@ public class CustomerService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "고객 정보를 찾을 수 없습니다."));
 
         String mergedAddress = mergeWithOriginalDetail(customer.getAddress(), newAddress);
-        String refinedAddress = mergedAddress.replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
-        double[] coords = getCoordinatesViaKakao(refinedAddress);
+        double[] coords = getCoordinatesViaKakao(mergedAddress);
 
         customer.setAddress(mergedAddress);
         customer.setLatitude(coords[0] == 0.0 ? null : coords[0]);
@@ -557,8 +737,7 @@ public class CustomerService {
     }
 
     public Customer addCustomer(com.hanibe.fieldwork_101.dto.CustomerAddRequest request, User user) {
-        String refinedAddress = request.getAddress().replaceAll("\\(.*?\\)", "").replaceAll("\\s+", " ").trim();
-        double[] coords = getCoordinatesViaKakao(refinedAddress);
+        double[] coords = getCoordinatesViaKakao(request.getAddress());
 
         Customer customer = Customer.builder()
                 .name(request.getName())
@@ -710,10 +889,11 @@ public class CustomerService {
         List<AddressCorrectionDto.Candidate> validCandidates = new ArrayList<>();
 
         for (OpenAiService.RefinedCandidate lc : llmCandidates) {
-            double[] coords = getCoordinatesViaKakao(lc.refinedAddress);
+            String merged = mergeWithOriginalDetail(c.getAddress(), lc.refinedAddress);
+            double[] coords = getCoordinatesViaKakao(merged);
             if (coords[0] != 0.0 && coords[1] != 0.0) {
                 validCandidates.add(AddressCorrectionDto.Candidate.builder()
-                        .refinedAddress(lc.refinedAddress)
+                        .refinedAddress(merged)
                         .confidence(lc.confidence)
                         .build());
             }
@@ -738,9 +918,10 @@ public class CustomerService {
                 for (OpenAiService.RefinedCandidate lc : llmCandidates) {
                     // 신뢰도가 HIGH인 후보만 대상
                     if ("HIGH".equalsIgnoreCase(lc.confidence)) {
-                        double[] coords = getCoordinatesViaKakao(lc.refinedAddress);
+                        String merged = mergeWithOriginalDetail(c.getAddress(), lc.refinedAddress);
+                        double[] coords = getCoordinatesViaKakao(merged);
                         if (coords[0] != 0.0 && coords[1] != 0.0) {
-                            c.setAddress(lc.refinedAddress);
+                            c.setAddress(merged);
                             c.setLatitude(coords[0]);
                             c.setLongitude(coords[1]);
                             customerRepository.save(c);
