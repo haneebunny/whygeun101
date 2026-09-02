@@ -31,6 +31,8 @@ jwt:
 kakao:
   # 카카오 디벨로퍼스에서 발급받은 REST API 키
   client-id: ${KAKAO_REST_API_KEY:543622ef4fa082724af123eddd102943}
+  # 회원 탈퇴 시 카카오 연결 끊기(unlink)에 사용하는 어드민 키. 비어 있으면 unlink를 건너뜀
+  admin-key: ${KAKAO_ADMIN_KEY:}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

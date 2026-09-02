@@ -6,6 +6,7 @@ import com.hanibe.fieldwork_101.entity.User;
 import com.hanibe.fieldwork_101.repository.UserRepository;
 import com.hanibe.fieldwork_101.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -26,6 +28,10 @@ public class AuthService {
 
     @Value("${kakao.client-id}")
     private String kakaoClientId;
+
+    // 카카오 연결 끊기(unlink)에 필요한 어드민 키. 비어 있으면 unlink를 건너뛴다.
+    @Value("${kakao.admin-key:}")
+    private String kakaoAdminKey;
 
     public AuthResponse kakaoLogin(KakaoLoginRequest request) {
         // 1. 카카오 액세스 토큰 요청
@@ -64,6 +70,27 @@ public class AuthService {
                 .accessToken(jwt)
                 .nickname(user.getNickname())
                 .build();
+    }
+
+    // 회원 탈퇴 시 카카오 서비스 연결을 끊는다. 어드민 키가 없거나 실패해도 예외를 던지지 않는다.
+    public void unlinkKakaoAccount(String kakaoId) {
+        if (kakaoAdminKey == null || kakaoAdminKey.isBlank() || kakaoId == null) {
+            return;
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.set("Authorization", "KakaoAK " + kakaoAdminKey);
+
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("target_id_type", "user_id");
+            params.add("target_id", kakaoId);
+
+            restTemplate.postForEntity("https://kapi.kakao.com/v1/user/unlink",
+                    new HttpEntity<>(params, headers), String.class);
+        } catch (Exception e) {
+            log.warn("카카오 연결 끊기 실패 (kakaoId={}): {}", kakaoId, e.getMessage());
+        }
     }
 
     private String getKakaoAccessToken(String code, String redirectUri) {

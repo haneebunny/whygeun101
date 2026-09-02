@@ -10,6 +10,7 @@ import CustomerTab from "@/src/presentation/features/customer/CustomerTab";
 import SettingsTab from "@/src/presentation/features/settings/SettingsTab";
 
 import { customerRepository } from "@/src/data/repositories/customerApi";
+import { authRepository } from "@/src/data/repositories/authApi";
 import { Customer, FailedCustomer } from "@/src/domain/entities/types";
 import { StatusProvider } from "@/src/presentation/components/StatusContext";
 import {
@@ -148,21 +149,64 @@ function PageContent() {
     return true;
   };
 
+  // 로그인 세션과 로컬 데이터를 모두 비움 (로그아웃, 세션 만료, 회원 탈퇴 공용)
+  const clearSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("nickname");
+    localStorage.removeItem("routeOrder");
+    setIsLoggedIn(false);
+    setNickname("");
+    setSuccessCustomers([]);
+    setFailedCustomers([]);
+    resetUser();
+  };
+
   const handleLogout = () => {
     showConfirm({
       title: "로그아웃",
       message: "로그아웃 하시겠습니까?",
       confirmText: "로그아웃",
       onConfirm: () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("nickname");
-        localStorage.removeItem("routeOrder");
-        setIsLoggedIn(false);
-        setNickname("");
-        setSuccessCustomers([]);
-        setFailedCustomers([]);
-        resetUser();
+        clearSession();
         trackEvent("Logout");
+      },
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    showConfirm({
+      title: "회원 탈퇴",
+      message:
+        "계정을 삭제하면 등록한 고객 목록, 방문 일정, 메모가 모두 삭제되며 복구할 수 없습니다.\n정말 탈퇴하시겠습니까?",
+      confirmText: "탈퇴 및 삭제",
+      onConfirm: async () => {
+        try {
+          await authRepository.deleteAccount();
+          trackEvent("DeleteAccount");
+          clearSession();
+          showAlert({
+            title: "탈퇴 완료",
+            message: "계정과 관련 데이터가 모두 삭제되었습니다.\n그동안 이용해 주셔서 감사합니다.",
+            type: "success",
+          });
+        } catch (error: unknown) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          if (err.message === "UNAUTHORIZED") {
+            clearSession();
+            showAlert({
+              title: "로그인 세션 만료",
+              message: "로그인 정보가 만료되었습니다. 다시 로그인 후 시도해주세요.",
+              type: "warning",
+            });
+            return;
+          }
+          showAlert({
+            title: "탈퇴 실패",
+            message: "계정 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+            type: "error",
+            debugInfo: err.stack || err.toString(),
+          });
+        }
       },
     });
   };
@@ -200,11 +244,7 @@ function PageContent() {
           message: "로그인 정보가 만료되었습니다. 다시 로그인해주세요.",
           type: "warning",
         });
-        localStorage.removeItem("token");
-        localStorage.removeItem("nickname");
-        localStorage.removeItem("routeOrder");
-        setIsLoggedIn(false);
-        setNickname("");
+        clearSession();
       } else {
         console.error(error);
         showAlert({
@@ -640,6 +680,7 @@ function PageContent() {
           <SettingsTab
             nickname={nickname}
             onLogout={isLoggedIn ? handleLogout : () => setShowLoginView(true)}
+            onDeleteAccount={handleDeleteAccount}
             backendIp={BACKEND_IP}
           />
         )}

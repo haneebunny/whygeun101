@@ -27,6 +27,13 @@ export class AuthApi implements AuthRepository {
     });
     return response.json();
   }
+
+  async deleteAccount(): Promise<{ success: boolean }> {
+    const response = await httpClient.request("/api/users/me", {
+      method: "DELETE",
+    });
+    return response.json();
+  }
 }
 
 export const authRepository = new AuthApi();
