@@ -83,9 +83,21 @@ public class CalendarSyncService {
             visit.setLastSeenAt(now);
 
             Map<String, List<Customer>> households = householdsByName(customers, name);
-            if (households.size() == 1) {
+            // 이미 연결된 집(자동이든 사람이 고른 것이든)이 아직 명단에 있으면 그 집을 그대로 쓴다.
+            // 동명이인이라서 사람이 골라 준 선택을 다음 동기화가 다시 검토로 되돌리면 안 된다.
+            String keptAddress = visit.getCustomerAddress() == null ? null : visit.getCustomerAddress().trim();
+            List<Customer> household = null;
+            String address = null;
+            if (keptAddress != null && households.containsKey(keptAddress)) {
+                address = keptAddress;
+                household = households.get(keptAddress);
+            } else if (households.size() == 1) {
                 Map.Entry<String, List<Customer>> only = households.entrySet().iterator().next();
-                for (Customer c : only.getValue()) {
+                address = only.getKey();
+                household = only.getValue();
+            }
+            if (household != null) {
+                for (Customer c : household) {
                     if (!event.getStart().equals(c.getVisitTime())) {
                         c.setVisitTime(event.getStart());
                         changed.add(c);
@@ -93,7 +105,7 @@ public class CalendarSyncService {
                 }
                 visit.setStatus(CalendarVisit.STATUS_MATCHED);
                 visit.setReviewReason(null);
-                visit.setCustomerAddress(only.getKey());
+                visit.setCustomerAddress(address);
                 if (!wasMatched) result.matched();
                 else if (!event.getStart().equals(previousStart)) result.updated();
                 else result.unchanged();

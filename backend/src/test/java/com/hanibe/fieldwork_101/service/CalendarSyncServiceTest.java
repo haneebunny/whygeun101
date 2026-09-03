@@ -208,4 +208,24 @@ class CalendarSyncServiceTest {
         assertThat(a2.getVisitTime()).isEqualTo("2026-09-02 10:00");
         assertThat(b.getVisitTime()).isNull();
     }
+
+    @Test
+    @DisplayName("검토에서 고른 집은 다음 동기화에서 동명이인이어도 그대로 유지된다")
+    void chosenHouseholdSurvivesNextSync() {
+        Customer a = customer(10, "최민수", "서울 강동구 A로 1", null);
+        Customer b = customer(11, "최민수", "서울 강동구 B로 2", "2026-09-02 10:00");
+        given(customerRepository.findByUserId(1L)).willReturn(List.of(a, b));
+        CalendarVisit chosen = CalendarVisit.builder().id(9L).user(user).requestNo("222").customerName("최민수")
+                .startAt("2026-09-02 10:00").status(CalendarVisit.STATUS_MATCHED).customerAddress("서울 강동구 B로 2").build();
+        given(visitRepository.findByUserId(1L)).willReturn(List.of(chosen));
+
+        CalendarSyncResult result = service.sync(user, request(event("최민수 고객님 방문요청(222)", "2026-09-02 11:00")));
+
+        assertThat(result.getUpdated()).isEqualTo(1);
+        assertThat(result.getReview()).isZero();
+        assertThat(chosen.getStatus()).isEqualTo(CalendarVisit.STATUS_MATCHED);
+        assertThat(chosen.getCustomerAddress()).isEqualTo("서울 강동구 B로 2");
+        assertThat(b.getVisitTime()).isEqualTo("2026-09-02 11:00");
+        assertThat(a.getVisitTime()).isNull();
+    }
 }
