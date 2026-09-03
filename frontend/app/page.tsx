@@ -98,6 +98,8 @@ function PageContent() {
           window.dispatchEvent(new CustomEvent("nativeCalendarEvents", { detail: data.payload }));
         } else if (data.type === "NATIVE_CALENDAR_DENIED") {
           window.dispatchEvent(new CustomEvent("nativeCalendarDenied"));
+        } else if (data.type === "NATIVE_CALENDAR_ERROR") {
+          window.dispatchEvent(new CustomEvent("nativeCalendarError", { detail: data.payload }));
         }
       } catch (e) {
         console.error("Error handling native message:", e);

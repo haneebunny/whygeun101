@@ -10,8 +10,8 @@ import { trackEvent } from "@/src/presentation/utils/mixpanel";
  * 폰 캘린더의 "○○○ 고객님 방문요청(번호)" 일정을 방문 시각으로 가져오는 흐름.
  *
  * 웹 → 앱 껍데기: REQUEST_CALENDAR_EVENTS (며칠치 읽을지)
- * 앱 껍데기 → 웹: NATIVE_CALENDAR_EVENTS { events, range_start, range_end } 또는 NATIVE_CALENDAR_DENIED
- *   (app/page.tsx의 수신부가 window 이벤트 nativeCalendarEvents / nativeCalendarDenied 로 바꿔 준다)
+ * 앱 껍데기 → 웹: NATIVE_CALENDAR_EVENTS { events, range_start, range_end }, NATIVE_CALENDAR_DENIED, NATIVE_CALENDAR_ERROR
+ *   (app/page.tsx의 수신부가 window 이벤트 nativeCalendarEvents / nativeCalendarDenied / nativeCalendarError 로 바꿔 준다)
  * 웹 → 서버: /api/calendar/sync
  *
  * 브라우저에서는 캘린더를 읽을 수 없어 앱에서만 동작한다.
@@ -123,12 +123,27 @@ export const useCalendarSync = (onSynced?: (result: CalendarSyncResult) => void)
       });
     };
 
+    const handleError = (e: Event) => {
+      clearTimer();
+      setIsSyncing(false);
+      manualRef.current = false;
+      const detail = (e as CustomEvent<{ message?: string }>).detail;
+      showAlert({
+        title: "캘린더를 읽지 못했습니다",
+        message: "휴대폰 캘린더를 읽는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.",
+        type: "error",
+        debugInfo: detail?.message,
+      });
+    };
+
     window.addEventListener("nativeCalendarEvents", handleEvents);
     window.addEventListener("nativeCalendarDenied", handleDenied);
+    window.addEventListener("nativeCalendarError", handleError);
     return () => {
       clearTimer();
       window.removeEventListener("nativeCalendarEvents", handleEvents);
       window.removeEventListener("nativeCalendarDenied", handleDenied);
+      window.removeEventListener("nativeCalendarError", handleError);
     };
     // showAlert는 컨텍스트에서 오는 안정된 함수다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
