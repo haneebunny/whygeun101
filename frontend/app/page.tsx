@@ -19,6 +19,7 @@ import {
 } from "@/src/presentation/components/AlertContext";
 import AddCustomerModal from "@/src/presentation/components/AddCustomerModal";
 import { identifyUser, resetUser, trackEvent } from "@/src/presentation/utils/mixpanel";
+import { isCalendarSyncEnabled, useCalendarSync } from "@/components/hooks/useCalendarSync";
 
 function PageContent() {
   const BACKEND_IP = process.env.NEXT_PUBLIC_API_URL || "";
@@ -92,6 +93,11 @@ function PageContent() {
           const { latitude, longitude } = data.payload;
           console.log("GPS received from native device:", latitude, longitude);
           window.dispatchEvent(new CustomEvent("nativeGps", { detail: data.payload }));
+        } else if (data.type === "NATIVE_CALENDAR_EVENTS") {
+          // 앱 껍데기가 폰 캘린더에서 읽은 방문요청 일정. useCalendarSync가 받아 서버로 보낸다.
+          window.dispatchEvent(new CustomEvent("nativeCalendarEvents", { detail: data.payload }));
+        } else if (data.type === "NATIVE_CALENDAR_DENIED") {
+          window.dispatchEvent(new CustomEvent("nativeCalendarDenied"));
         }
       } catch (e) {
         console.error("Error handling native message:", e);
@@ -604,10 +610,16 @@ function PageContent() {
     }
   };
 
+  // 캘린더 일정 가져오기. 동기화가 끝나면 고객 목록을 다시 읽어 방문 시각을 반영한다.
+  const { sync: syncCalendar, isSyncing: isCalendarSyncing } = useCalendarSync(() => fetchCustomers());
+
   useEffect(() => {
     if (isLoggedIn) {
       fetchCustomers();
+      // 앱을 열 때마다 조용히 동기화한다. 바뀐 게 있을 때만 알림이 뜬다.
+      if (isCalendarSyncEnabled()) syncCalendar(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
 
   if (isLoading) return <div className="min-h-screen bg-[#f8fafc]"></div>;
@@ -682,6 +694,12 @@ function PageContent() {
             onLogout={isLoggedIn ? handleLogout : () => setShowLoginView(true)}
             onDeleteAccount={handleDeleteAccount}
             backendIp={BACKEND_IP}
+            isLoggedIn={isLoggedIn}
+            onCalendarSync={() => {
+              if (!requireAuth("캘린더 일정 가져오기")) return;
+              syncCalendar(true);
+            }}
+            isCalendarSyncing={isCalendarSyncing}
           />
         )}
       </main>
