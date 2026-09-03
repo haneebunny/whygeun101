@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useStatus } from "../../components/StatusContext";
+import {
+  isCalendarSyncEnabled,
+  isNativeApp,
+  setCalendarSyncEnabled,
+} from "@/components/hooks/useCalendarSync";
 import { useAlert } from "../../components/AlertContext";
 import { authRepository } from "../../../data/repositories/authApi";
 
@@ -10,15 +16,33 @@ interface SettingsTabProps {
   onLogout: () => void;
   onDeleteAccount: () => void;
   backendIp: string;
+  isLoggedIn?: boolean;
+  /** 폰 캘린더에서 방문요청 일정을 지금 가져온다. 앱에서만 동작한다. */
+  onCalendarSync?: () => void;
+  isCalendarSyncing?: boolean;
 }
 
 export default function SettingsTab({
   nickname,
   onLogout,
   onDeleteAccount,
+  isLoggedIn = false,
+  onCalendarSync,
+  isCalendarSyncing = false,
 }: SettingsTabProps) {
+  const router = useRouter();
   const { statusLabels, updateStatusLabel } = useStatus();
   const { showAlert } = useAlert();
+
+  // 캘린더 연동 스위치. 기기(브라우저)마다 저장되고, 켜져 있으면 앱을 열 때마다 자동으로 가져온다.
+  const [calendarEnabled, setCalendarEnabled] = useState(() => isCalendarSyncEnabled());
+  const inApp = typeof window !== "undefined" && isNativeApp();
+  const handleToggleCalendar = () => {
+    const next = !calendarEnabled;
+    setCalendarEnabled(next);
+    setCalendarSyncEnabled(next);
+    if (next && onCalendarSync) onCalendarSync();
+  };
 
   const [localNone, setLocalNone] = useState(statusLabels.none);
   const [localContact, setLocalContact] = useState(statusLabels.contact);
@@ -233,6 +257,61 @@ export default function SettingsTab({
               <span className="text-slate-400 font-bold text-[10px] ml-0.5">❯</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Calendar Sync */}
+      <section className="flex flex-col gap-3 animate-slide-up">
+        <div className="px-1">
+          <h3 className="text-[16px] font-black text-slate-900">
+            캘린더 연동
+          </h3>
+        </div>
+        <div className="glass-card p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between p-3.5 bg-white/20 hover:bg-white/35 rounded-xl border border-white/10 transition">
+            <div className="flex flex-col gap-0.5 pr-3">
+              <span className="text-[13.5px] font-bold text-slate-700">캘린더 일정 가져오기</span>
+              <span className="text-[10.5px] text-slate-450 font-semibold leading-relaxed">
+                휴대폰 캘린더의 &quot;고객님 방문요청&quot; 일정을 방문 일정으로 등록합니다. 다른 일정은 읽지 않아요.
+              </span>
+            </div>
+            <button
+              onClick={handleToggleCalendar}
+              className={`w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${calendarEnabled ? "bg-primary" : "bg-slate-300/50"}`}
+              aria-pressed={calendarEnabled}
+            >
+              <div
+                className={`bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform ${calendarEnabled ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </button>
+          </div>
+
+          <button
+            onClick={onCalendarSync}
+            disabled={isCalendarSyncing || !onCalendarSync}
+            className="w-full py-3 bg-white/40 hover:bg-white/60 border border-primary/20 text-primary font-extrabold text-[12.5px] rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isCalendarSyncing && (
+              <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+            )}
+            {isCalendarSyncing ? "가져오는 중..." : "지금 가져오기"}
+          </button>
+          {!inApp && (
+            <p className="text-[10.5px] text-slate-450 font-semibold px-1">
+              휴대폰 캘린더는 모두의 외근 앱에서만 읽을 수 있어요.
+            </p>
+          )}
+
+          <button
+            onClick={() => (isLoggedIn ? router.push("/calendar-review") : onLogout())}
+            className="flex items-center justify-between p-3.5 bg-white/20 hover:bg-white/35 rounded-xl border border-white/10 transition cursor-pointer text-left"
+          >
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[13.5px] font-bold text-slate-700">확인 필요한 일정</span>
+              <span className="text-[10.5px] text-slate-450 font-semibold">이름이 겹치거나 명단에 없어 자동으로 못 넣은 일정</span>
+            </div>
+            <span className="text-slate-400 font-bold text-[10px] ml-0.5">❯</span>
+          </button>
         </div>
       </section>
 
