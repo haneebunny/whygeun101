@@ -4,6 +4,26 @@
 
 ---
 
+## 📅 2026-09-03 (목)
+
+### 1. LLM 주소 보정 프롬프트 고도화 및 지능형 지오코딩 폴백(Fallback) 강화
+* **배경 및 원인 분석**:
+  * 고객 주소 중 행정구역이 잘못 적힌 경우(예: '동작구 명일로' — 명일로는 강동구 소속) LLM이 자치구 오기를 그대로 유지하여 카카오 지도 API 검색에서 탈락하는 문제 해결.
+  * 지번과 건물번호가 뒤섞인 주소(예: '가락동 913번지 345 송파 헬리오시티')에서 LLM이 가상의 도로명('가락로 913')을 환각(Hallucination)하여 좌표 조회가 실패하던 문제 해결.
+* **작업 내용**:
+  * **LLM 프롬프트 고도화 ([OpenAiService.java](file:///Users/hani/Desktop/project/sales-route-map/backend/src/main/java/com/hanibe/fieldwork_101/service/OpenAiService.java))**:
+    * 도로명·아파트명과 자치구가 상충할 시 도로명의 실제 행정구역으로 구 명칭을 자동 교정하도록 지침 명시.
+    * 복합/비정형 주소 입력 시 가상의 도로명을 지어내지 않고 실존 표준 도로명/지번을 우선 적용하도록 환각 방지 지침 강화.
+    * '111 1303호'와 같이 '동' 글자가 누락된 경우 정규화 지침 추가.
+  * **백엔드 파이프라인 보강 ([CustomerService.java](file:///Users/hani/Desktop/project/sales-route-map/backend/src/main/java/com/hanibe/fieldwork_101/service/CustomerService.java))**:
+    * 단지명 추출 시 `시티`, `팰리스`, `파크`, `포레` 등 복합 랜드마크 접미사 지원 확대 및 유닛 번호(동/호) 분리 정제.
+    * 지오코딩 0단계에서 행정구역 상충 시 단지명 단독 키워드 지오코딩 2차 시도 로직 구현.
+    * LLM 응답 실패나 0건 반환 시, 원본의 단지명/건물명 키워드 검색을 통해 실제 표준 도로명 주소와 동호수를 결합하여 유효 후보를 자동 복구하는 폴백 파이프라인 구축.
+  * **단위 테스트 추가 ([CustomerServiceAddressTest.java](file:///Users/hani/Desktop/project/sales-route-map/backend/src/test/java/com/hanibe/fieldwork_101/service/CustomerServiceAddressTest.java))**:
+    * 행정구역 상충 교정, LLM 실패 시 단지명 키워드 폴백, 헬리오시티/공백 동호수 복구 케이스 3종 검증 완료.
+
+---
+
 ## 📅 2026-07-13 (월)
 
 ### 1. 믹스패널(Mixpanel) 로그 및 유저 행동 트래킹 연동

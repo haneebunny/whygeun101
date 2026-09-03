@@ -180,8 +180,15 @@ public class CustomerService {
         // 0단계: 아파트/단지명 우선 키워드 지오코딩 시도
         String bldName = extractBuildingName(address);
         String regionPrefix = extractRegionPrefix(address);
-        if (!bldName.isEmpty() && !regionPrefix.isEmpty()) {
-            double[] coords = callKakaoKeywordApi(regionPrefix + " " + bldName);
+        if (!bldName.isEmpty()) {
+            if (!regionPrefix.isEmpty()) {
+                double[] coords = callKakaoKeywordApi(regionPrefix + " " + bldName);
+                if (coords[0] != 0.0 && coords[1] != 0.0) {
+                    return coords;
+                }
+            }
+            // 행정구역(시/구) 불일치 시 단지명 단독 검색 (예: '서울 동작구'에 삼익그린11차아파트가 없을 때)
+            double[] coords = callKakaoKeywordApi(bldName);
             if (coords[0] != 0.0 && coords[1] != 0.0) {
                 return coords;
             }
@@ -284,6 +291,37 @@ public class CustomerService {
         return new double[]{0.0, 0.0};
     }
 
+    private Map<String, Object> searchKakaoKeywordDetail(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return null;
+        }
+        String cleanQuery = query.trim();
+        String keywordUrl = "https://dapi.kakao.com/v2/local/search/keyword.json?query=" + cleanQuery;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "KakaoAK " + kakaoClientId);
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<Map> kwResponse = restTemplate.exchange(keywordUrl, HttpMethod.GET, entity, Map.class);
+            List<Map<String, Object>> kwDocs = (List<Map<String, Object>>) kwResponse.getBody().get("documents");
+            if (kwDocs != null && !kwDocs.isEmpty()) {
+                Map<String, Object> firstDoc = kwDocs.get(0);
+                String roadAddr = (String) firstDoc.get("road_address_name");
+                String jibunAddr = (String) firstDoc.get("address_name");
+                String bestAddr = (roadAddr != null && !roadAddr.trim().isEmpty()) ? roadAddr : jibunAddr;
+                if (bestAddr != null && !bestAddr.trim().isEmpty()) {
+                    return Map.of(
+                            "address", bestAddr,
+                            "placeName", firstDoc.getOrDefault("place_name", ""),
+                            "lat", Double.parseDouble(firstDoc.get("y").toString()),
+                            "lng", Double.parseDouble(firstDoc.get("x").toString())
+                    );
+                }
+            }
+        } catch (Exception e) {}
+        return null;
+    }
+
     private String extractRegionPrefix(String address) {
         if (address == null) return "서울 강동구";
         Pattern pattern = Pattern.compile("^(서울(?:특별시)?\\s+[가-힣]+구|[가-힣]+(?:도|시|군|구)\\s+[가-힣]+(?:시|군|구))");
@@ -309,10 +347,11 @@ public class CustomerService {
                     continue;
                 }
                 String cleanItem = item.replaceAll("^[가-힣]{1,4}(동|읍|면|리)\\s+", "").trim();
+                cleanItem = cleanItem.replaceAll("\\s*\\d+동.*|\\s*\\d+호.*", "").trim();
                 if (!cleanItem.isEmpty()) {
                     return cleanItem;
                 } else if (item.length() >= 2 && !item.matches("\\d+")) {
-                    return item;
+                    return item.replaceAll("\\s*\\d+동.*|\\s*\\d+호.*", "").trim();
                 }
             }
         }
@@ -322,21 +361,26 @@ public class CustomerService {
         if (matcherComma.find()) {
             String cand = matcherComma.group(1).trim();
             if (!cand.matches("^[가-힣]{1,4}(동|읍|면|리)$")) {
-                return cand;
+                cand = cand.replaceAll("\\s*\\d+동.*|\\s*\\d+호.*", "").trim();
+                if (!cand.isEmpty()) {
+                    return cand;
+                }
             }
         }
 
         // 3. 법정동 뒤에 붙은 아파트명 (예: 명일동, 한양아파트 / 길동160번지 헤리티지자이)
-        Matcher matcherTail = Pattern.compile("([가-힣]{1,4}(동|리))[\\s,]+([가-힣0-9a-zA-Z\\s]+?(아파트|단지|빌라|맨션|오피스텔|타운|자이|힐스테이트|아이파크|캐슬|푸르지오|더샵|파밀리에|수자인|베네시티|하우스|하이츠|노블하임|빌|팰리스|마을))").matcher(address);
+        Matcher matcherTail = Pattern.compile("([가-힣]{1,4}(동|리))[\\s,]+([가-힣0-9a-zA-Z\\s]+?(아파트|단지|빌라|맨션|오피스텔|타운|자이|힐스테이트|아이파크|캐슬|푸르지오|더샵|파밀리에|수자인|베네시티|하우스|하이츠|노블하임|빌|팰리스|마을|시티|파크|포레|포레스트|스카이|리움|헤링턴))").matcher(address);
         if (matcherTail.find()) {
-            return matcherTail.group(3).trim();
+            String cand = matcherTail.group(3).trim().replaceAll("\\s*\\d+동.*|\\s*\\d+호.*", "").trim();
+            cand = cand.replaceAll("^.*?번지\\s*", "").replaceAll("^\\d+\\s*", "").trim();
+            if (!cand.isEmpty()) return cand;
         }
 
-        // 4. 일반 아파트/단지/빌라 키워드 매칭
-        Matcher matcherGen = Pattern.compile("([가-힣0-9a-zA-Z]{2,15}(?:아파트|단지|빌라|맨션|오피스텔|타운|자이|힐스테이트|아이파크|롯데캐슬|푸르지오|더샵|파밀리에|수자인|베네시티|노블하임))").matcher(address);
+        // 4. 일반 아파트/단지/빌라/시티 키워드 매칭
+        Matcher matcherGen = Pattern.compile("([가-힣0-9a-zA-Z]{2,15}(?:아파트|단지|빌라|맨션|오피스텔|타운|자이|힐스테이트|아이파크|롯데캐슬|캐슬|푸르지오|더샵|파밀리에|수자인|베네시티|노블하임|시티|팰리스|파크|하우스|하이츠|마을|포레|리움))").matcher(address);
         if (matcherGen.find()) {
-            String cand = matcherGen.group(1).trim();
-            if (!cand.matches(".*(특별시|광역시|특별자치시|구|로|길)$")) {
+            String cand = matcherGen.group(1).trim().replaceAll("\\s*\\d+동.*|\\s*\\d+호.*", "").trim();
+            if (!cand.matches(".*(특별시|광역시|특별자치시|구|로|길)$") && !cand.isEmpty()) {
                 return cand;
             }
         }
@@ -369,6 +413,12 @@ public class CustomerService {
         Matcher m3 = Pattern.compile("\\b(\\d{1,4})-(\\d{3,4})\\b").matcher(address);
         if (m3.find()) {
             return m3.group(1) + "동 " + m3.group(2) + "호";
+        }
+
+        // 3-2. 공백 구분 동 + 호 (예: 111 1303호, 101 502호)
+        Matcher mSpaceDongHo = Pattern.compile("(?:^|\\s)(\\d{1,4})\\s+(\\d{3,4})호").matcher(address);
+        if (mSpaceDongHo.find()) {
+            return mSpaceDongHo.group(1) + "동 " + mSpaceDongHo.group(2) + "호";
         }
 
         // 4. 층수 + 호수 (예: 1층 102호)
@@ -885,7 +935,8 @@ public class CustomerService {
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."));
 
-        List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(c.getAddress());
+        String preprocessed = preprocessAttachedNumbers(c.getAddress());
+        List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(preprocessed);
         List<AddressCorrectionDto.Candidate> validCandidates = new ArrayList<>();
 
         for (OpenAiService.RefinedCandidate lc : llmCandidates) {
@@ -896,6 +947,28 @@ public class CustomerService {
                         .refinedAddress(merged)
                         .confidence(lc.confidence)
                         .build());
+            }
+        }
+
+        // 💡 [폴백] LLM 후보군이 없거나 유효 좌표가 안 나올 경우, 단지명/건물명 키워드 검색을 통해 실제 표준 주소 도출
+        if (validCandidates.isEmpty()) {
+            String bldName = extractBuildingName(c.getAddress());
+            if (!bldName.isEmpty()) {
+                Map<String, Object> kwResult = searchKakaoKeywordDetail(bldName);
+                if (kwResult != null && kwResult.get("address") != null) {
+                    String baseRoadOrJibun = (String) kwResult.get("address");
+                    String dongHo = extractDongHo(c.getAddress());
+                    String refined = baseRoadOrJibun;
+                    if (!dongHo.isEmpty()) {
+                        refined += ", " + bldName + " " + dongHo;
+                    } else {
+                        refined += ", " + bldName;
+                    }
+                    validCandidates.add(AddressCorrectionDto.Candidate.builder()
+                            .refinedAddress(refined)
+                            .confidence("MEDIUM")
+                            .build());
+                }
             }
         }
 
@@ -914,7 +987,8 @@ public class CustomerService {
 
         for (Customer c : allCustomers) {
             if (c.getLatitude() == null || c.getLongitude() == null) {
-                List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(c.getAddress());
+                String preprocessed = preprocessAttachedNumbers(c.getAddress());
+                List<OpenAiService.RefinedCandidate> llmCandidates = openAiService.suggestCorrections(preprocessed);
                 for (OpenAiService.RefinedCandidate lc : llmCandidates) {
                     // 신뢰도가 HIGH인 후보만 대상
                     if ("HIGH".equalsIgnoreCase(lc.confidence)) {
